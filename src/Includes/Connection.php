@@ -23,8 +23,8 @@ class Connection
 		static::$handle = new PDO(
 			match( CONNECT_LIST["Crm"]->driver ){
 				DriverType::PostgreSQL => self::getPostgresSQL(),
-				DriverType::SqlServer => self::getSqlServer(),
 				DriverType::Sqlite => self::getSqlLite(),
+				DriverType::MsSql => self::getMsSql(),
 				DriverType::MySql => self::getMySQL(),
 					default => self::getPdoException(),
 			},
@@ -56,7 +56,7 @@ class Connection
 		);
 	}
 	
-	private static function getSqlServer(
+	private static function getMsSql(
 	): string {
 		return sprintf( "sqlsrv:Server=%s,%s;Database=%s;TrustServerCertificate=1",
 			CONNECT_LIST["Crm"]->host, CONNECT_LIST["Crm"]->port, CONNECT_LIST["Crm"]->name

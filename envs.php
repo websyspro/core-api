@@ -26,7 +26,7 @@ if( defined( "CONNECT_LIST" ) === false ){
       pass: "Qazwsx@123"
     ),
     "Crm" => new ConnectionDNS(
-      driver: DriverType::SqlServer, 
+      driver: DriverType::MsSql, 
       host: "localhost", 
       port: "1433", 
       name: "crm",
