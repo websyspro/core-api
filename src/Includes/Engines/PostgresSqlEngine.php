@@ -1,15 +1,16 @@
 <?php
 
-namespace Websyspro\Server\Includes\Drivers;
+namespace Websyspro\Server\Includes\Engines;
 
+use stdClass;
 use Websyspro\Server\Includes\Connection;
 
-class PostgreSQLSchema
-extends AbstractSchema
+class PostgreSQLEngine
+extends AbstractEngine
 {
   public function extractKey(
   ): void {
-    $single = Connection::single(
+    $single = Connection::set( $this->schema )->single(
       "SELECT information_schema.key_column_usage.column_name
          FROM information_schema.table_constraints
       	     ,information_schema.key_column_usage
@@ -20,17 +21,13 @@ extends AbstractSchema
           AND information_schema.key_column_usage.table_schema  = information_schema.table_constraints.table_schema", [ $this->table ]
     );
     
-    if( $single instanceof object ) {
+    if( $single instanceof stdClass ) {
       $this->key = $single->column_name;
     }    
   }
 
-  public function validKey(
-    object $field
-  ): bool {
-		return false;
-	}  
-
-  public function extractFields(
-  ): void {}  
+  public function extractFieldsArr(
+  ): array {
+    return [];
+  }
 }

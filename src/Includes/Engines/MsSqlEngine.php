@@ -1,16 +1,16 @@
 <?php
 
-namespace Websyspro\Server\Includes\Drivers;
+namespace Websyspro\Server\Includes\Engines;
 
 use stdClass;
 use Websyspro\Server\Includes\Connection;
 
-class MsSqlSchema
-extends AbstractSchema
+class MsSqlEngine
+extends AbstractEngine
 {
   public function extractKey(
   ): void {
-    $single = Connection::single(
+    $single = Connection::set( $this->schema )->single(
       "SELECT kcu.column_name as column_name
 	 			 FROM information_schema.table_constraints tc
 				 JOIN information_schema.key_column_usage kcu
@@ -36,12 +36,14 @@ extends AbstractSchema
     }
   }
 
-  public function validKey(
-    object $field
-  ): bool {
-		return false;
+  public function extractFieldsArr(
+  ): array {
+		return Connection::set( $this->schema )->query(
+      "SELECT information_schema.columns.column_name
+		         ,information_schema.columns.data_type
+	       FROM information_schema.columns
+	      WHERE information_schema.columns.table_name = ?
+     ORDER BY information_schema.columns.ordinal_position asc ", [ $this->table ]
+    );
 	}
-	
-  public function extractFields(
-  ): void {}
 }

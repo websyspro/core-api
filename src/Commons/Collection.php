@@ -60,18 +60,22 @@ class Collection
   public function where(
     Closure $fn
   ): Collection {
+    $arrayFilter = array_filter(
+      array: $this->items, 
+      callback: $fn, 
+      mode: ARRAY_FILTER_USE_BOTH
+    );
+
     return new Collection(
-      items: array_filter(
-        array: $this->items, 
-        callback: $fn, 
-        mode: ARRAY_FILTER_USE_BOTH
+      items: array_values(
+        $arrayFilter
       )
     );
   }
 
   public function first(
   ): mixed {
-    if( $this->empty()){
+    if( $this->empty() ){
       return null;
     }
 

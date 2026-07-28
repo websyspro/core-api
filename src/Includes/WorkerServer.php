@@ -273,7 +273,8 @@ class WorkerServer extends AbstractWorkerServer
 
             [$handler, $params] = $match;
 
-            $result = $handler(...$this->resolveArgs($handler, $request->withParams($params)));
+            $request->setParams($params);
+            $result = $handler(...$this->resolveArgs($handler, $request));
 
             if ($result instanceof Response) {
                 return $result;

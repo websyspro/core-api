@@ -35,7 +35,7 @@ class Request
     public readonly string $rawBody;
     public readonly array  $headers;
     public readonly array  $query;   // /?userId=123       => $request->query['userId']
-    public readonly array  $params;  // /:userId           => $request->params['userId']
+    public array           $params;  // /:userId           => $request->params['userId'] (mutavel)
     public readonly mixed  $body;    // JSON obj           => $request->body->userId
                                      // JSON array         => $request->body[0]
                                      // form-encoded       => $request->body['userId']
@@ -45,15 +45,6 @@ class Request
       array $parsed, 
       array $params = []
     ){
-      if( isset($_SERVER[ "REQUEST_URI" ]) === false ){
-        [ $requestMethod, $requestUri ] = explode(
-          " ", $parsed['firstLine']
-        );
-
-        $_SERVER[ "REQUEST_METHOD" ] = $requestMethod;
-        $_SERVER[ "REQUEST_URI" ] = $requestUri;
-      }
-
         $parts         = explode(' ', trim($parsed['firstLine']));
         $this->method  = strtoupper($parts[0] ?? 'GET');
         $fullPath      = $parsed['firstLine'] !== '' ? (explode(' ', $parsed['firstLine'])[1] ?? '/') : '/';
@@ -164,21 +155,12 @@ class Request
     }
 
     /**
-     * Retorna uma nova instancia com os params de rota preenchidos.
+     * Define os parametros de rota extraidos do path dinamico.
+     * Ex: /users/:id -> ['id' => '123']
      */
-    public function withParams(array $params): static
+    public function setParams(array $params): void
     {
-        return new static($this->toParsed(), $params);
-    }
-
-    private function toParsed(): array
-    {
-        return [
-            'firstLine' => "{$this->method} {$this->path} HTTP/1.1",
-            'headers'   => $this->headers,
-            'body'      => $this->rawBody,
-            'remaining' => '',
-        ];
+        $this->params = $this->sanitizeArray($params);
     }
 
     /**

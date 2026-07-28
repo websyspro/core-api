@@ -2,11 +2,14 @@
 
 namespace Websyspro\Server\Applications\Global\Views;
 
+use Websyspro\Server\Includes\Enums\DriverSchema;
 use Websyspro\Server\Includes\QueryView;
 
 class PostsView
 extends QueryView
 {
+  protected DriverSchema $schema = DriverSchema::Global;
+
   public function sql(
   ): string {
     return (

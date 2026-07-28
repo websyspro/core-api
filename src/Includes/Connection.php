@@ -5,83 +5,106 @@ namespace Websyspro\Server\Includes;
 use PDO;
 use PDOException;
 use PDOStatement;
+use Websyspro\Server\Includes\Enums\DriverSchema;
 use Websyspro\Server\Includes\Enums\DriverType;
+use Websyspro\Server\Includes\Interfaces\ConnectionDNS;
 use function sprintf;
 use function defined;
 use function array_slice;
-
 class Connection
 {
-	private static PDO $handle;
+	private static array $handles = []; // ✅ Um handle por schema
 	private static array $statements = [];
-	private static string $module;
+	
+	public function __construct(
+		private ConnectionDNS $connectionDNS
+	){}
 
-	public static function connect(
-	): PDO {
-		if( isset( static::$handle )){
-			return static::$handle;
+	public static function getConnectionDNSBySchema(
+		DriverSchema $schema
+	): ConnectionDNS|null {
+		if( defined( "CONNECT_LIST" )){
+			$connectionDNSArr = CONNECT_LIST->where( 
+				fn( ConnectionDNS $dns ) => $dns->schema === $schema
+			);
+
+			if( $connectionDNSArr->empty() === false ){
+				if( $connectionDNSArr->first() instanceof ConnectionDNS ){
+					return $connectionDNSArr->first();
+				}
+			}
 		}
 
-		static::$handle = new PDO(
-			match( CONNECT_LIST[ static::getModule() ]->driver ){
-				DriverType::PostgreSQL => self::getPostgresSQL(),
-				DriverType::Sqlite => self::getSqlLite(),
-				DriverType::MsSql => self::getMsSql(),
-				DriverType::MySql => self::getMySQL(),
-					default => self::getPdoException(),
-			},
-			CONNECT_LIST[ static::getModule() ]->user,
-			CONNECT_LIST[ static::getModule() ]->pass, self::getPdoOptions()
-		);
-
-		return static::$handle;
+		return null;		
 	}
 
-	private static function getModule(
-	): string {
-		[ static::$module ] = array_slice(
-			explode( "/", $_SERVER[ "REQUEST_URI" ]), 2, 1
-		);
+	public static function set(
+		DriverSchema $schema
+	): Connection|null {
+		return new static( self::getConnectionDNSBySchema($schema) );
+	}	
 
-		return "crm";
+	public static function driver(
+		DriverSchema $schema
+	): DriverType|null {
+		$dns = self::getConnectionDNSBySchema($schema);
+		return $dns?->type;
+	}	
+
+	public function connect(
+	): void {
+		if ( isset(self::$handles[ $this->connectionDNS->schema->name ]) === false ){
+			self::$handles[ $this->connectionDNS->schema->name ] = new PDO(
+				match ($this->connectionDNS->type) {
+					DriverType::PostgreSQL => $this->getPostgresSQL(),
+					DriverType::Sqlite => $this->getSqlLite(),
+					DriverType::MsSql => $this->getMsSql(),
+					DriverType::MySql => $this->getMySQL(),
+					default => $this->getPdoException(),
+				},
+				$this->connectionDNS->user,
+				$this->connectionDNS->pass,
+				self::getPdoOptions()
+			);
+		}
 	}
 
-	private static function getMySQL(
+	private function getMySQL(
 	): string {
 		return sprintf( "mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4",
-			CONNECT_LIST[  static::getModule()  ]->host, CONNECT_LIST[  static::getModule()  ]->port, CONNECT_LIST[ static::getModule() ]->name
+			$this->connectionDNS->host, $this->connectionDNS->port, $this->connectionDNS->name
 		);
 	}
 
-	private static function getPostgresSQL(
+	private function getPostgresSQL(
 	): string {
 		return sprintf( "pgsql:host=%s;port=%s;dbname=%s",
-			CONNECT_LIST[ static::getModule() ]->host, CONNECT_LIST[ static::getModule() ]->port, CONNECT_LIST[ static::getModule() ]->name
+			$this->connectionDNS->host, $this->connectionDNS->port, $this->connectionDNS->name
 		);
 	}
-	
-	private static function getSqlLite(
+
+	private function getSqlLite(
 	): string {
-		return sprintf( "sqlite:%s",
-			CONNECT_LIST[ static::getModule() ]->name
+		return sprintf( "sqlite:%s", 
+			$this->connectionDNS->name
 		);
 	}
-	
-	private static function getMsSql(
+
+	private function getMsSql(
 	): string {
 		return sprintf( "sqlsrv:Server=%s,%s;Database=%s;TrustServerCertificate=1",
-			CONNECT_LIST[ static::getModule() ]->host, CONNECT_LIST[ static::getModule() ]->port, CONNECT_LIST[ static::getModule() ]->name
+			$this->connectionDNS->host, $this->connectionDNS->port, $this->connectionDNS->name
 		);
 	}
 
-	private static function getPdoException(
+	private function getPdoException(
 	): PDOException {
-		return throw new PDOException(
-			sprintf( "Driver '%s' nao suportado", CONNECT_LIST[ static::getModule() ]->driver->name )
+		throw new PDOException(
+			sprintf("Driver '%s' nao suportado", $this->connectionDNS->type->name)
 		);
 	}
 
-	private static function getPdoOptions(
+	private function getPdoOptions(
 	): array {
 		return [
 			PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_OBJ,
@@ -90,28 +113,24 @@ class Connection
 		];
 	}
 
-	public static function driver(
-	): DriverType {
-		if( defined( "CONNECT_LIST" ) === false ){}
-		return CONNECT_LIST[ static::getModule() ]->driver;
-	}
-
-
-  public static function query(
+  public function query(
 		string $sql,
 		array $params = [],
-		 bool $single = false,
+		bool $single = false,
 		array $fetchAll = [],
 	): array|object|null {
-		static::connect();
+		$this->connect();
 
-		if( isset( static::$statements[ $sql ]) === false ) {
-			static::$statements[ $sql ] = static::$handle->prepare( $sql );
+		$stmtKey = $this->connectionDNS->schema->name . ':' . $sql;
+		if ( isset( self::$statements[ $stmtKey ]) === false ) {
+			self::$statements[$stmtKey] = self::$handles[
+				$this->connectionDNS->schema->name
+			]->prepare( $sql );
 		}
 
-		$statements = static::$statements[ $sql ];
-		if( $statements instanceof PDOStatement ){
-			if( $statements->execute( $params )){
+		$statements = self::$statements[$stmtKey];
+		if ($statements instanceof PDOStatement) {
+			if ($statements->execute( $params )) {
 				$fetchAll = $single === false
 					? $statements->fetchAll()
 					: $statements->fetch();
@@ -122,26 +141,29 @@ class Connection
 		return $fetchAll;
   }
 
-  public static function single(
+  public function single(
 		string $sql,
 		array $params = []
-	): object {
+	): object|null {
 		return static::query( $sql, $params, true );
   }	
 
-	public static function execute(
+	public function execute(
 		string $sql, 
 		array $params = [],
 		int $rowCount = 0
 	): int {
-		static::connect();
-
-		if( isset(static::$statements[$sql]) === false ){
-			static::$statements[ $sql ] = static::$handle->prepare( $sql );
+		$this->connect();
+		
+		$stmtKey = $this->connectionDNS->schema->name . ':' . $sql;
+		if (!isset(self::$statements[$stmtKey])) {
+			self::$statements[$stmtKey] = self::$handles[
+				$this->connectionDNS->schema->name
+			]->prepare( $sql );
 		}
 
-		$statements = static::$statements[$sql];
-		if( $statements->execute( $params )){
+		$statements = self::$statements[$stmtKey];
+		if ($statements->execute($params)) {
 			$rowCount = $statements->rowCount();
 		}
 		
@@ -149,8 +171,8 @@ class Connection
 		return $rowCount;
 	}
 
-	public static function lastInsertId(
-	): string {
-		return static::$handle->lastInsertId();
+	public function lastInsertId(): string
+	{
+		return $this->connect()->lastInsertId();
 	}
 }

@@ -6,7 +6,6 @@ class FieldStructure
 {
   public function __construct(
     public string $name,
-    public string $type,
-    public bool $key = false
+    public string $type
   ){}
 }

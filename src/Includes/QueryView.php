@@ -3,31 +3,54 @@
 namespace Websyspro\Server\Includes;
 
 use Exception;
-use Websyspro\Server\Includes\Drivers\AbstractSchema;
-use Websyspro\Server\Includes\Drivers\MsSqlSchema;
-use Websyspro\Server\Includes\Drivers\MySqlSchema;
-use Websyspro\Server\Includes\Drivers\PostgreSQLSchema;
-use Websyspro\Server\Includes\Drivers\SqliteSchema;
+use JsonSerializable;
+use Websyspro\Server\Includes\Engines\AbstractEngine;
+use Websyspro\Server\Includes\Engines\MsSqlEngine;
+use Websyspro\Server\Includes\Engines\MySqlEngine;
+use Websyspro\Server\Includes\Engines\PostgreSQLEngine;
+use Websyspro\Server\Includes\Engines\SqliteEngine;
+use Websyspro\Server\Includes\Enums\DriverSchema;
 use Websyspro\Server\Includes\Enums\DriverType;
 
 abstract class QueryView
 {
-  public readonly AbstractSchema $schema;
+  public AbstractEngine $engine;
+  protected DriverSchema $schema;
+
   public function __construct(
   ){
-    $this->defineSchema();
+    $this->defineEngine();
   }
 
   abstract public function sql(): string;
 
-  private function defineSchema(
+  private function defineEngine(
   ): void {
-    $this->schema = match( Connection::driver()){
-      DriverType::PostgreSQL => new PostgreSQLSchema( $this->sql()),
-      DriverType::Sqlite => new SqliteSchema( $this->sql()),
-      DriverType::MySql => new MySqlSchema( $this->sql()),
-      DriverType::MsSql => new MsSqlSchema( $this->sql()),
+    $driverType = Connection::driver(
+      $this->schema
+    );
+
+    $this->engine = match( $driverType ){
+      DriverType::PostgreSQL => new PostgreSQLEngine( $this->sql(), $this->schema ),
+      DriverType::Sqlite => new SqliteEngine( $this->sql(), $this->schema ),
+      DriverType::MySql => new MySqlEngine( $this->sql(), $this->schema ),
+      DriverType::MsSql => new MsSqlEngine( $this->sql(), $this->schema ),
         default => throw new Exception( "" )
     };
+  }
+
+  /**
+   * Permite serialização JSON automática
+   * Retorna os metadados extraídos pelo Engine
+   */
+  public function jsonSerialize(): array
+  {
+    return [
+      'table'  => $this->engine->table,
+      'key'    => $this->engine->key,
+      'fields' => $this->engine->fields->toArray(),
+      'sql'    => $this->engine->sql,
+      'schema' => $this->schema->name,
+    ];
   }
 }

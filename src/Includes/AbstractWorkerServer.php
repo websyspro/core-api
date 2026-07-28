@@ -158,7 +158,12 @@ abstract class AbstractWorkerServer
                   if ($request === null) {
                       break;
                   }
-
+                  
+                  // Popula $_SERVER para compatibilidade com Apache/Nginx
+                  [$method, $uri] = explode(' ', $request['firstLine'], 3);
+                  $_SERVER['REQUEST_METHOD'] = $method;
+                  $_SERVER['REQUEST_URI'] = $uri;
+                  
                   $connection = $request['headers']['connection'] ?? 'keep-alive';
                   $keepAlive  = strtolower($connection) !== 'close';
                   $response   = $this->handleRequest(new Request($request));
