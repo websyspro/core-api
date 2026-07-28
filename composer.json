@@ -1,0 +1,26 @@
+{
+  "name": "websyspro/apps",
+  "description": "set of libraries for PHP development",
+  "type": "library",
+  "license": "MIT",
+  "keywords": [ "server", "tcp", "http", "router", "workers", "async"],
+  "authors": [
+    {
+      "name": "Emerson Thiago",
+      "email": "cpd.emersontsa@gmail.com"
+    }
+  ],
+  "require": {
+    "php": ">=8.1"
+  },
+  "autoload": {
+    "psr-4": {
+      "Websyspro\\Server\\": "src/"
+    }
+  },
+  "minimum-stability": "stable",
+  "scripts": {
+    "git:push": "git add . && git commit -m \"Update components\" && git push origin HEAD",
+    "git:pull": "git pull origin main"
+  }
+}

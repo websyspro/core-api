@@ -1,0 +1,69 @@
+# Composer
+/vendor/
+/composer.phar
+
+# Dependências
+/node_modules/
+
+# Arquivos de ambiente
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+storage/logs/
+
+# Cache
+.cache/
+cache/
+tmp/
+temp/
+
+# PHPUnit
+.phpunit.result.cache
+coverage/
+.clover.xml
+
+# PHPStan
+/phpstan.neon.dist.bak
+/phpstan.cache
+
+# Psalm
+.psalm/
+
+# IDEs
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Sistema Operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Arquivos temporários
+*.swp
+*.swo
+*~
+
+# Docker
+docker-compose.override.yml
+
+# Arquivos gerados
+dist/
+build/
+
+# SQLite
+*.sqlite
+*.sqlite3
+*.db
+
+# Certificados locais
+*.pem
+*.key
+
+# Backup
+/database/
