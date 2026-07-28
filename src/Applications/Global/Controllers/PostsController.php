@@ -1,14 +1,14 @@
 <?php
 
-namespace Websyspro\Server\Applications\Crm\Controllers;
+namespace Websyspro\Server\Applications\Global\Controllers;
 
-use Websyspro\Server\Applications\Crm\Views\PropostaView;
+use Websyspro\Server\Applications\Global\Views\PostsView;
 use Websyspro\Server\Includes\Decorators\Server\Controller;
 use Websyspro\Server\Includes\Decorators\Server\Get;
 
 
-#[Controller("proposta")]
-class PropostaController
+#[Controller( "posts" )]
+class PostsController
 {
   public function __construct(
   ){}
@@ -16,6 +16,6 @@ class PropostaController
   #[Get("/")]
   public function index(
   ): mixed {
-    return new PropostaView();
+    return new PostsView();
   }  
 }

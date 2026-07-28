@@ -21,15 +21,15 @@ class Connection
 		}
 
 		static::$handle = new PDO(
-			match( CONNECT_LIST["Crm"]->driver ){
+			match( CONNECT_LIST["Global"]->driver ){
 				DriverType::PostgreSQL => self::getPostgresSQL(),
 				DriverType::Sqlite => self::getSqlLite(),
 				DriverType::MsSql => self::getMsSql(),
 				DriverType::MySql => self::getMySQL(),
 					default => self::getPdoException(),
 			},
-			CONNECT_LIST["Crm"]->user,
-			CONNECT_LIST["Crm"]->pass, self::getPdoOptions()
+			CONNECT_LIST["Global"]->user,
+			CONNECT_LIST["Global"]->pass, self::getPdoOptions()
 		);
 
 		return static::$handle;
@@ -38,35 +38,35 @@ class Connection
 	private static function getMySQL(
 	): string {
 		return sprintf( "mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4",
-			CONNECT_LIST["Crm"]->host, CONNECT_LIST["Crm"]->port, CONNECT_LIST["Crm"]->name
+			CONNECT_LIST[ "Global" ]->host, CONNECT_LIST[ "Global" ]->port, CONNECT_LIST["Global"]->name
 		);
 	}
 
 	private static function getPostgresSQL(
 	): string {
 		return sprintf( "pgsql:host=%s;port=%s;dbname=%s",
-			CONNECT_LIST["Crm"]->host, CONNECT_LIST["Crm"]->port, CONNECT_LIST["Crm"]->name
+			CONNECT_LIST["Global"]->host, CONNECT_LIST["Global"]->port, CONNECT_LIST["Global"]->name
 		);
 	}
 	
 	private static function getSqlLite(
 	): string {
 		return sprintf( "sqlite:%s",
-			CONNECT_LIST["Crm"]->name
+			CONNECT_LIST["Global"]->name
 		);
 	}
 	
 	private static function getMsSql(
 	): string {
 		return sprintf( "sqlsrv:Server=%s,%s;Database=%s;TrustServerCertificate=1",
-			CONNECT_LIST["Crm"]->host, CONNECT_LIST["Crm"]->port, CONNECT_LIST["Crm"]->name
+			CONNECT_LIST["Global"]->host, CONNECT_LIST["Global"]->port, CONNECT_LIST["Global"]->name
 		);
 	}
 
 	private static function getPdoException(
 	): PDOException {
 		return throw new PDOException(
-			sprintf( "Driver '%s' nao suportado", CONNECT_LIST["Crm"]->driver->name )
+			sprintf( "Driver '%s' nao suportado", CONNECT_LIST["Global"]->driver->name )
 		);
 	}
 
@@ -82,50 +82,70 @@ class Connection
 	public static function driver(
 	): DriverType {
 		if( defined( "CONNECT_LIST" ) === false ){}
-		return CONNECT_LIST["Crm"]->driver;
+		return CONNECT_LIST["Global"]->driver;
 	}
 
 
   public static function query(
 		string $sql,
 		array $params = [],
+		 bool $single = false,
 		array $fetchAll = [],
-	): array {
-    static::connect();
+	): array|object|null {
+		try {
+			static::connect();
 
-		if( isset( static::$statements[ $sql ]) === false ) {
-			static::$statements[ $sql ] = static::$handle->prepare( $sql );
-		}
-
-		$statements = static::$statements[ $sql ];
-		if( $statements instanceof PDOStatement ){
-			if( $statements->execute( $params )){
-				$fetchAll = $statements->fetchAll();
+			if( isset( static::$statements[ $sql ]) === false ) {
+				static::$statements[ $sql ] = static::$handle->prepare( $sql );
 			}
+
+			$statements = static::$statements[ $sql ];
+			if( $statements instanceof PDOStatement ){
+				if( $statements->execute( $params )){
+					$fetchAll = $single === false
+						? $statements->fetchAll()
+						: $statements->fetch();
+				}
+			}
+			
+			$statements->closeCursor();
+			return $fetchAll;
+		} catch( PDOException $e ) {
+			Logger::error( "Query error: " . $e->getMessage());
+			throw $e;
 		}
-		
-		$statements->closeCursor();
-		return $fetchAll;
   }
+
+  public static function single(
+		string $sql,
+		array $params = []
+	): object {
+		return static::query( $sql, $params, true );
+  }	
 
 	public static function execute(
 		string $sql, 
 		array $params = [],
 		int $rowCount = 0
 	): int {
-		static::connect();
+		try {
+			static::connect();
 
-		if( isset(static::$statements[$sql]) === false ){
-			static::$statements[ $sql ] = static::$handle->prepare( $sql );
-		}
+			if( isset(static::$statements[$sql]) === false ){
+				static::$statements[ $sql ] = static::$handle->prepare( $sql );
+			}
 
-		$statements = static::$statements[$sql];
-		if( $statements->execute( $params )){
-			$rowCount = $statements->rowCount();
+			$statements = static::$statements[$sql];
+			if( $statements->execute( $params )){
+				$rowCount = $statements->rowCount();
+			}
+			
+			$statements->closeCursor();
+			return $rowCount;
+		} catch( PDOException $e ) {
+			Logger::error( "Execute error: " . $e->getMessage());
+			throw $e;
 		}
-		
-		$statements->closeCursor();
-		return $rowCount;
 	}
 
 	public static function lastInsertId(

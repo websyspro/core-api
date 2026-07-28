@@ -20,10 +20,10 @@ if( defined( "CONNECT_LIST" ) === false ){
     "Global" => new ConnectionDNS(
       driver: DriverType::MySql, 
       host: "localhost", 
-      port: "3308", 
-      name: "app",
+      port: "3306", 
+      name: "edocente",
       user: "root", 
-      pass: "Qazwsx@123"
+      pass: "qazwsx"
     ),
     "Crm" => new ConnectionDNS(
       driver: DriverType::MsSql, 
