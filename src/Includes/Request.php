@@ -5,7 +5,6 @@ namespace Websyspro\Server\Includes;
 use function explode;
 use function parse_str;
 use function json_decode;
-use function json_encode;
 use function str_contains;
 use function strtolower;
 use function strtoupper;
@@ -42,8 +41,19 @@ class Request
                                      // form-encoded       => $request->body['userId']
     public readonly array  $files;   // multipart upload   => $request->files['avatar']
 
-    public function __construct(array $parsed, array $params = [])
-    {
+    public function __construct(
+      array $parsed, 
+      array $params = []
+    ){
+      if( isset($_SERVER[ "REQUEST_URI" ]) === false ){
+        [ $requestMethod, $requestUri ] = explode(
+          " ", $parsed['firstLine']
+        );
+
+        $_SERVER[ "REQUEST_METHOD" ] = $requestMethod;
+        $_SERVER[ "REQUEST_URI" ] = $requestUri;
+      }
+
         $parts         = explode(' ', trim($parsed['firstLine']));
         $this->method  = strtoupper($parts[0] ?? 'GET');
         $fullPath      = $parsed['firstLine'] !== '' ? (explode(' ', $parsed['firstLine'])[1] ?? '/') : '/';

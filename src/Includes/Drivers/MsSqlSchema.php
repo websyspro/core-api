@@ -28,12 +28,20 @@ extends AbstractSchema
 				 join sys.columns c on a.constraint_column_id=c.column_id 
 	 				and a.referenced_object_id=c.object_id 
    			where lower( object_name( parent_object_id )) = lower( ? ))
-   	 order by kcu.table_schema, kcu.table_name, kcu.constraint_name", [
-			$this->table, $this->table
-		]);
+   	 order by kcu.table_schema, kcu.table_name, kcu.constraint_name", [ $this->table, $this->table ]
+		);
 
     if( $single instanceof stdClass ) {
       $this->key = $single->column_name;
     }
-  }  
+  }
+
+  public function validKey(
+    object $field
+  ): bool {
+		return false;
+	}
+	
+  public function extractFields(
+  ): void {}
 }

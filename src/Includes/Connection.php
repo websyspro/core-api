@@ -8,11 +8,13 @@ use PDOStatement;
 use Websyspro\Server\Includes\Enums\DriverType;
 use function sprintf;
 use function defined;
+use function array_slice;
 
 class Connection
 {
 	private static PDO $handle;
 	private static array $statements = [];
+	private static string $module;
 
 	public static function connect(
 	): PDO {
@@ -21,52 +23,61 @@ class Connection
 		}
 
 		static::$handle = new PDO(
-			match( CONNECT_LIST["Global"]->driver ){
+			match( CONNECT_LIST[ static::getModule() ]->driver ){
 				DriverType::PostgreSQL => self::getPostgresSQL(),
 				DriverType::Sqlite => self::getSqlLite(),
 				DriverType::MsSql => self::getMsSql(),
 				DriverType::MySql => self::getMySQL(),
 					default => self::getPdoException(),
 			},
-			CONNECT_LIST["Global"]->user,
-			CONNECT_LIST["Global"]->pass, self::getPdoOptions()
+			CONNECT_LIST[ static::getModule() ]->user,
+			CONNECT_LIST[ static::getModule() ]->pass, self::getPdoOptions()
 		);
 
 		return static::$handle;
 	}
 
+	private static function getModule(
+	): string {
+		[ static::$module ] = array_slice(
+			explode( "/", $_SERVER[ "REQUEST_URI" ]), 2, 1
+		);
+
+		return "crm";
+	}
+
 	private static function getMySQL(
 	): string {
 		return sprintf( "mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4",
-			CONNECT_LIST[ "Global" ]->host, CONNECT_LIST[ "Global" ]->port, CONNECT_LIST["Global"]->name
+			CONNECT_LIST[  static::getModule()  ]->host, CONNECT_LIST[  static::getModule()  ]->port, CONNECT_LIST[ static::getModule() ]->name
 		);
 	}
 
 	private static function getPostgresSQL(
 	): string {
 		return sprintf( "pgsql:host=%s;port=%s;dbname=%s",
-			CONNECT_LIST["Global"]->host, CONNECT_LIST["Global"]->port, CONNECT_LIST["Global"]->name
+			CONNECT_LIST[ static::getModule() ]->host, CONNECT_LIST[ static::getModule() ]->port, CONNECT_LIST[ static::getModule() ]->name
 		);
 	}
 	
 	private static function getSqlLite(
 	): string {
 		return sprintf( "sqlite:%s",
-			CONNECT_LIST["Global"]->name
+			CONNECT_LIST[ static::getModule() ]->name
 		);
 	}
 	
 	private static function getMsSql(
 	): string {
 		return sprintf( "sqlsrv:Server=%s,%s;Database=%s;TrustServerCertificate=1",
-			CONNECT_LIST["Global"]->host, CONNECT_LIST["Global"]->port, CONNECT_LIST["Global"]->name
+			CONNECT_LIST[ static::getModule() ]->host, CONNECT_LIST[ static::getModule() ]->port, CONNECT_LIST[ static::getModule() ]->name
 		);
 	}
 
 	private static function getPdoException(
 	): PDOException {
 		return throw new PDOException(
-			sprintf( "Driver '%s' nao suportado", CONNECT_LIST["Global"]->driver->name )
+			sprintf( "Driver '%s' nao suportado", CONNECT_LIST[ static::getModule() ]->driver->name )
 		);
 	}
 
@@ -82,7 +93,7 @@ class Connection
 	public static function driver(
 	): DriverType {
 		if( defined( "CONNECT_LIST" ) === false ){}
-		return CONNECT_LIST["Global"]->driver;
+		return CONNECT_LIST[ static::getModule() ]->driver;
 	}
 
 
@@ -92,28 +103,23 @@ class Connection
 		 bool $single = false,
 		array $fetchAll = [],
 	): array|object|null {
-		try {
-			static::connect();
+		static::connect();
 
-			if( isset( static::$statements[ $sql ]) === false ) {
-				static::$statements[ $sql ] = static::$handle->prepare( $sql );
-			}
-
-			$statements = static::$statements[ $sql ];
-			if( $statements instanceof PDOStatement ){
-				if( $statements->execute( $params )){
-					$fetchAll = $single === false
-						? $statements->fetchAll()
-						: $statements->fetch();
-				}
-			}
-			
-			$statements->closeCursor();
-			return $fetchAll;
-		} catch( PDOException $e ) {
-			Logger::error( "Query error: " . $e->getMessage());
-			throw $e;
+		if( isset( static::$statements[ $sql ]) === false ) {
+			static::$statements[ $sql ] = static::$handle->prepare( $sql );
 		}
+
+		$statements = static::$statements[ $sql ];
+		if( $statements instanceof PDOStatement ){
+			if( $statements->execute( $params )){
+				$fetchAll = $single === false
+					? $statements->fetchAll()
+					: $statements->fetch();
+			}
+		}
+		
+		$statements->closeCursor();
+		return $fetchAll;
   }
 
   public static function single(
@@ -128,24 +134,19 @@ class Connection
 		array $params = [],
 		int $rowCount = 0
 	): int {
-		try {
-			static::connect();
+		static::connect();
 
-			if( isset(static::$statements[$sql]) === false ){
-				static::$statements[ $sql ] = static::$handle->prepare( $sql );
-			}
-
-			$statements = static::$statements[$sql];
-			if( $statements->execute( $params )){
-				$rowCount = $statements->rowCount();
-			}
-			
-			$statements->closeCursor();
-			return $rowCount;
-		} catch( PDOException $e ) {
-			Logger::error( "Execute error: " . $e->getMessage());
-			throw $e;
+		if( isset(static::$statements[$sql]) === false ){
+			static::$statements[ $sql ] = static::$handle->prepare( $sql );
 		}
+
+		$statements = static::$statements[$sql];
+		if( $statements->execute( $params )){
+			$rowCount = $statements->rowCount();
+		}
+		
+		$statements->closeCursor();
+		return $rowCount;
 	}
 
 	public static function lastInsertId(

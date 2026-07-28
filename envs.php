@@ -17,7 +17,7 @@ if( defined( "App" ) === false ){
 
 if( defined( "CONNECT_LIST" ) === false ){
   define( "CONNECT_LIST", [
-    "Global" => new ConnectionDNS(
+    "global" => new ConnectionDNS(
       driver: DriverType::MySql, 
       host: "localhost", 
       port: "3306", 
@@ -25,7 +25,7 @@ if( defined( "CONNECT_LIST" ) === false ){
       user: "root", 
       pass: "qazwsx"
     ),
-    "Crm" => new ConnectionDNS(
+    "crm" => new ConnectionDNS(
       driver: DriverType::MsSql, 
       host: "localhost", 
       port: "1433", 

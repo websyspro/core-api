@@ -10,7 +10,6 @@ use Websyspro\Server\Includes\Request;
 use Websyspro\Server\Includes\Response;
 use Websyspro\Server\Includes\Container;
 use Websyspro\Server\Includes\Model;
-use Websyspro\Server\Database\SchemaManager;
 use Websyspro\Server\Includes\Decorators\Server\Controller;
 use Websyspro\Server\Includes\Decorators\Server\Module;
 use Websyspro\Server\Includes\Decorators\Server\Get;
@@ -29,6 +28,7 @@ use function preg_replace;
 use function array_keys;
 use function array_combine;
 use function array_slice;
+use function defined;
 
 class WorkerServer extends AbstractWorkerServer
 {

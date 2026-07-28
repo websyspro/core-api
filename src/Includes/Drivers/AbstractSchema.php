@@ -17,6 +17,7 @@ abstract class AbstractSchema
     $this->normalizedSql();
     $this->extractTable();
     $this->extractKey();
+    $this->extractFields();
   }
 
   public function normalizedSql(   
@@ -53,5 +54,12 @@ abstract class AbstractSchema
   }
 
   abstract public function extractKey(
+  ): void;
+
+  abstract public function validKey(
+    object $field
+  ): bool;
+
+  abstract public function extractFields(
   ): void;
 }

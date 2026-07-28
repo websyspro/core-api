@@ -2,7 +2,6 @@
 
 namespace Websyspro\Server\Includes\Drivers;
 
-use stdClass;
 use Websyspro\Server\Includes\Connection;
 
 class PostgreSQLSchema
@@ -21,8 +20,17 @@ extends AbstractSchema
           AND information_schema.key_column_usage.table_schema  = information_schema.table_constraints.table_schema", [ $this->table ]
     );
     
-    if( $single instanceof stdClass ) {
+    if( $single instanceof object ) {
       $this->key = $single->column_name;
     }    
   }
+
+  public function validKey(
+    object $field
+  ): bool {
+		return false;
+	}  
+
+  public function extractFields(
+  ): void {}  
 }
