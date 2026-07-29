@@ -8,7 +8,6 @@ use ReflectionClass;
 use ReflectionFunction;
 use ReflectionMethod;
 use Websyspro\Server\Includes\Enums\RequestMethod;
-use Websyspro\Server\Includes\Interfaces\AppStructure;
 use Websyspro\Server\Includes\Request;
 use Websyspro\Server\Includes\Response;
 use Websyspro\Server\Includes\Container;
@@ -142,34 +141,37 @@ extends AbstractWorkerServer
     );
   }
 
-    public function registerModules(array $modules): static
-    {
-        foreach ($modules as $moduleClass) {
-            $reflection = new ReflectionClass($moduleClass);
-            $moduleAttr = $reflection->getAttributes(Module::class)[0] ?? null;
+  public function registerModules(
+    array $modules
+  ): WorkerServer {
+    foreach( $modules as $moduleClass ) {
+      $reflection = new ReflectionClass($moduleClass);
+      $moduleAttr = $reflection->getAttributes( 
+        Module::class
+      )[0] ?? null;
 
-            if ($moduleAttr === null) {
-                continue;
-            }
+      if( $moduleAttr === null ){
+        continue;
+      }
 
-            $module        = $moduleAttr->newInstance();
-            $modulePrefix  = $module->name !== '' ? '/' . trim($module->name, '/') : '';
+      $module = $moduleAttr->newInstance();
+      $modulePrefix = $module->name !== '' ? '/' . trim($module->name, '/') : '';
 
-            // Passagem 1 — cria/sincroniza tabelas sem FKs
-            //$schema = SchemaManager::create();
-            //foreach ($module->entities as $entityClass) {
-                // $schema->syncTable($entityClass);
-            //}
+      // Passagem 1 — cria/sincroniza tabelas sem FKs
+      //$schema = SchemaManager::create();
+      //foreach ($module->entities as $entityClass) {
+          // $schema->syncTable($entityClass);
+      //}
 
-            // Passagem 2 — aplica FKs após todas as tabelas existirem
-            //foreach ($module->entities as $entityClass) {
-                // $schema->applyForeignKeys($entityClass);
-            //}
+      // Passagem 2 — aplica FKs após todas as tabelas existirem
+      //foreach ($module->entities as $entityClass) {
+          // $schema->applyForeignKeys($entityClass);
+      //}
 
-            $this->registerControllers($module->controllers, $modulePrefix);
-        }
+      $this->registerControllers($module->controllers, $modulePrefix);
+      }
 
-        return $this;
+      return $this;
     }
 
     public function registerControllers(array $controllers, string $modulePrefix = ''): static
@@ -298,7 +300,7 @@ extends AbstractWorkerServer
       ));
 
       if( $result instanceof Response ){
-          return $result;
+        return $result;
       }
 
       return Response::json($result);
