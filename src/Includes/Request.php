@@ -154,13 +154,11 @@ class Request
         return trim($value);
     }
 
-    /**
-     * Define os parametros de rota extraidos do path dinamico.
-     * Ex: /users/:id -> ['id' => '123']
-     */
-    public function setParams(array $params): void
-    {
-        $this->params = $this->sanitizeArray($params);
+    public function setParams(
+      array $params
+    ): Request {
+      $this->params = $this->sanitizeArray( $params );
+      return $this;
     }
 
     /**

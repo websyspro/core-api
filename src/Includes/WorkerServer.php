@@ -5,7 +5,10 @@ namespace Websyspro\Server\Includes;
 use Closure;
 use ErrorException;
 use ReflectionClass;
+use ReflectionFunction;
 use ReflectionMethod;
+use Websyspro\Server\Includes\Enums\RequestMethod;
+use Websyspro\Server\Includes\Interfaces\AppStructure;
 use Websyspro\Server\Includes\Request;
 use Websyspro\Server\Includes\Response;
 use Websyspro\Server\Includes\Container;
@@ -28,94 +31,117 @@ use function preg_replace;
 use function array_keys;
 use function array_combine;
 use function array_slice;
-use function defined;
+use function sprintf;
 
-class WorkerServer extends AbstractWorkerServer
+class WorkerServer 
+extends AbstractWorkerServer
 {
-    // ['POST /v1/users' => Closure, 'GET /v1/users' => Closure, ...]
-    private array  $routers = [];
-    private string $prefix;
+  private array  $routers = [];
+  private string $prefix;
 
-    public function __construct()
-    {
-        parent::__construct();
-        $version      = defined('API_VERSION') ? API_VERSION : 'v1';
-        $this->prefix = '/' . $version;
+  public function __construct(
+  ){
+    parent::__construct();
+    $this->definePrefix();
+  }
+
+  private function definePrefix(
+  ): void {
+    $this->prefix = sprintf(
+      "/v%s", App->version
+    );
+  }
+
+  private function registerRouter(
+    string $method, 
+    string $path,
+    Closure $handler
+  ): WorkerServer {
+    $this->routers[
+      sprintf( "%s %s%s", 
+        strtoupper( $method ), 
+          $this->prefix, $path
+      )
+    ] = $handler;
+
+    return $this;
+  }
+
+  private function matchRoute(
+    string $method,
+    string $requestPath
+  ): array|null {
+    foreach ( $this->routers as $key => $handler ){
+      [ $routeMethod, $routePath ] = explode(
+        " ", $key, 2
+      );
+
+      if( $routeMethod !== $method ){
+        continue;
+      }
+
+      $paramNames = [];
+      preg_match_all( "#:([a-zA-Z_]+)#", $routePath, $matches );
+      $paramNames = $matches[1];
+
+      $pattern = preg_replace( "#:([a-zA-Z_]+)#", '([^/]+)', $routePath);
+      $pattern = "#^{$pattern}$#";
+
+      if( !preg_match( $pattern, $requestPath, $values )){
+        continue;
+      }
+
+      $params = array_combine( $paramNames, array_slice( $values, 1 )) ?: [];
+      return [ $handler, $params ];
     }
 
-    private function registerRouter(string $method, string $path, Closure $handler): static
-    {
-        $this->routers[strtoupper($method) . ' ' . $this->prefix . $path] = $handler;
-        return $this;
-    }
+    return null;
+  }
 
-    /**
-     * Tenta fazer match da rota registrada contra o path da requisicao.
-     * Extrai os parametros dinamicos e retorna [handler, params] ou null.
-     *
-     * Ex: rota "/users/:id/posts/:postId" contra "/users/42/posts/7"
-     *     retorna ['id' => '42', 'postId' => '7']
-     */
-    private function matchRoute(string $method, string $requestPath): ?array
-    {
-        foreach ($this->routers as $key => $handler) {
-            [$routeMethod, $routePath] = explode(' ', $key, 2);
+  public function get(
+    string $path,
+    Closure $handler
+  ): WorkerServer {
+    return $this->registerRouter(
+      RequestMethod::GET->value, $path, $handler
+    );
+  }
 
-            if ($routeMethod !== $method) {
-                continue;
-            }
+  public function post(
+    string $path,
+    Closure $handler
+  ): WorkerServer {
+    return $this->registerRouter(
+      RequestMethod::POST->value, $path, $handler
+    );
+  }
 
-            // Extrai nomes dos params da rota (:id, :postId, ...)
-            $paramNames = [];
-            preg_match_all('/:([a-zA-Z_]+)/', $routePath, $matches);
-            $paramNames = $matches[1];
+  public function put(
+    string $path, Closure $handler
+  ): WorkerServer {
+    return $this->registerRouter(
+      RequestMethod::PUT->value, $path, $handler
+    );
+  }
 
-            // Converte a rota em regex: /users/:id => /users/([^/]+)
-            $pattern = preg_replace('/:([a-zA-Z_]+)/', '([^/]+)', $routePath);
-            $pattern = '#^' . $pattern . '$#';
+  public function patch(
+    string $path,
+    Closure $handler
+  ): WorkerServer {
+    return $this->registerRouter(
+      RequestMethod::PATCH->value, $path, $handler
+    );
+  }
 
-            if (!preg_match($pattern, $requestPath, $values)) {
-                continue;
-            }
+  public function delete(
+    string $path,
+    Closure $handler
+  ): WorkerServer {
+    return $this->registerRouter(
+      RequestMethod::DELETE->name, $path, $handler
+    );
+  }
 
-            // $values[0] e o match completo, params comecam em [1]
-            $params = array_combine($paramNames, array_slice($values, 1)) ?: [];
-
-            return [$handler, $params];
-        }
-
-        return null;
-    }
-
-    public function get(string $path, Closure $handler): static    {
-        return $this->registerRouter('GET', $path, $handler);
-    }
-
-    public function post(string $path, Closure $handler): static
-    {
-        return $this->registerRouter('POST', $path, $handler);
-    }
-
-    public function put(string $path, Closure $handler): static
-    {
-        return $this->registerRouter('PUT', $path, $handler);
-    }
-
-    public function patch(string $path, Closure $handler): static
-    {
-        return $this->registerRouter('PATCH', $path, $handler);
-    }
-
-    public function delete(string $path, Closure $handler): static
-    {
-        return $this->registerRouter('DELETE', $path, $handler);
-    }
-
-    /**
-     * Registra um controller lendo os atributos via Reflection.
-     * #[Controller("users")] define o prefixo base.
-     * #[Get("/:id")] define o metodo HTTP e sub-path do metodo.
-     */
     public function registerModules(array $modules): static
     {
         foreach ($modules as $moduleClass) {
@@ -194,17 +220,9 @@ class WorkerServer extends AbstractWorkerServer
         return array_keys($this->routers);
     }
 
-    /**
-     * Resolve os argumentos do handler inspecionando os parametros via Reflection.
-     * #[Body]  => hidrata o Model com $request->body
-     * #[Query] => hidrata o Model com $request->query
-     * #[Param] => hidrata o Model com $request->params
-     * #[File]  => hidrata o Model com $request->files
-     * Request  => injeta o request diretamente
-     */
     private function resolveArgs(Closure $handler, Request $request): array
     {
-        $reflection = new \ReflectionFunction($handler);
+        $reflection = new ReflectionFunction($handler);
         $args       = [];
 
         foreach ($reflection->getParameters() as $param) {
@@ -257,32 +275,35 @@ class WorkerServer extends AbstractWorkerServer
         return $args;
     }
 
-    /**
-     * Extrai metodo e path e despacha para o handler registrado.
-     * Se o handler retornar Response, usa diretamente.
-     * Qualquer outro tipo (array, object, scalar) é automaticamente wrapped em Response::json().
-     */
-    protected function handleRequest(Request $request): Response
-    {
-        try {
-            $match = $this->matchRoute($request->method, $request->path);
+  protected function handleRequest(
+    Request $request
+  ): Response {
+    try {
+      $match = $this->matchRoute(
+        $request->method, $request->path
+      );
 
-            if ($match === null) {
-                return Response::text("404 - {$request->method} {$request->path} nao encontrado", 404);
-            }
+      if( $match === null ){
+        return Response::text(
+          "404 - {$request->method} {$request->path} nao encontrado", 404
+        );
+      }
 
-            [$handler, $params] = $match;
+      [ $handler, $params ] = $match;
 
-            $request->setParams($params);
-            $result = $handler(...$this->resolveArgs($handler, $request));
+      $result = $handler( ...$this->resolveArgs(
+        $handler, $request->setParams(
+          $params
+        )
+      ));
 
-            if ($result instanceof Response) {
-                return $result;
-            }
+      if( $result instanceof Response ){
+          return $result;
+      }
 
-            return Response::json($result);
-        } catch(ErrorException $error) {
-            return Response::text("500 - InternalError", 500);
-        }
+      return Response::json($result);
+    } catch(ErrorException $error) {
+      return Response::text("500 - InternalError", 500);
     }
+  }
 }
