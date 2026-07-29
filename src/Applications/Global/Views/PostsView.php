@@ -2,14 +2,14 @@
 
 namespace Websyspro\Server\Applications\Global\Views;
 
+use Websyspro\Server\Includes\Decorators\Database\OriginSchema;
 use Websyspro\Server\Includes\Enums\Schema;
 use Websyspro\Server\Includes\QueryView;
 
+#[OriginSchema( Schema::Global )]
 class PostsView
 extends QueryView
 {
-  protected Schema $schema = Schema::Global;
-
   public function sql(
   ): string {
     return (
