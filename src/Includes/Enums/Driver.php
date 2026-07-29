@@ -2,7 +2,7 @@
 
 namespace Websyspro\Server\Includes\Enums;
 
-enum DriverType
+enum Driver
 {
   case MySql;
   case Sqlite;

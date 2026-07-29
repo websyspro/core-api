@@ -5,10 +5,12 @@ namespace Websyspro\Server\Includes\Engines;
 class SqliteEngine
 extends AbstractEngine
 {
-  public function extractKey(
-  ): void {}
+  public function extractKeyArgs(
+  ): array {
+    return [];
+  }
 
-  public function extractFieldsArr(
+  public function extractFieldsArgs(
   ): array {
     return [];
   }  

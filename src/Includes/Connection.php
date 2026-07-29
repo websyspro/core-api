@@ -5,15 +5,16 @@ namespace Websyspro\Server\Includes;
 use PDO;
 use PDOException;
 use PDOStatement;
-use Websyspro\Server\Includes\Enums\DriverSchema;
-use Websyspro\Server\Includes\Enums\DriverType;
+use Websyspro\Server\Includes\Enums\Driver;
 use Websyspro\Server\Includes\Interfaces\ConnectionDNS;
+use Websyspro\Server\Includes\Enums\DriverType;
+use Websyspro\Server\Includes\Enums\Schema;
 use function sprintf;
 use function defined;
-use function array_slice;
+
 class Connection
 {
-	private static array $handles = []; // ✅ Um handle por schema
+	private static array $handles = [];
 	private static array $statements = [];
 	
 	public function __construct(
@@ -21,7 +22,7 @@ class Connection
 	){}
 
 	public static function getConnectionDNSBySchema(
-		DriverSchema $schema
+		Schema $schema
 	): ConnectionDNS|null {
 		if( defined( "CONNECT_LIST" )){
 			$connectionDNSArr = CONNECT_LIST->where( 
@@ -39,28 +40,27 @@ class Connection
 	}
 
 	public static function set(
-		DriverSchema $schema
+		Schema $schema
 	): Connection|null {
 		return new static( self::getConnectionDNSBySchema($schema) );
 	}	
 
-	public static function driver(
-		DriverSchema $schema
-	): DriverType|null {
-		$dns = self::getConnectionDNSBySchema($schema);
-		return $dns?->type;
+	public static function connectionDNS(
+		Schema $schema
+	): ConnectionDNS|null {
+		return self::getConnectionDNSBySchema($schema);
 	}	
 
 	public function connect(
 	): void {
-		if ( isset(self::$handles[ $this->connectionDNS->schema->name ]) === false ){
+		if ( isset( self::$handles[ $this->connectionDNS->schema->name ]) === false ){
 			self::$handles[ $this->connectionDNS->schema->name ] = new PDO(
-				match ($this->connectionDNS->type) {
-					DriverType::PostgreSQL => $this->getPostgresSQL(),
-					DriverType::Sqlite => $this->getSqlLite(),
-					DriverType::MsSql => $this->getMsSql(),
-					DriverType::MySql => $this->getMySQL(),
-					default => $this->getPdoException(),
+				match( $this->connectionDNS->driver ) {
+					Driver::PostgreSQL => $this->getPostgresSQL(),
+					Driver::Sqlite => $this->getSqlLite(),
+					Driver::MsSql => $this->getMsSql(),
+					Driver::MySql => $this->getMySQL(),
+						default => $this->getPdoException(),
 				},
 				$this->connectionDNS->user,
 				$this->connectionDNS->pass,
@@ -100,7 +100,7 @@ class Connection
 	private function getPdoException(
 	): PDOException {
 		throw new PDOException(
-			sprintf("Driver '%s' nao suportado", $this->connectionDNS->type->name)
+			sprintf("Driver '%s' nao suportado", $this->connectionDNS->driver->name)
 		);
 	}
 

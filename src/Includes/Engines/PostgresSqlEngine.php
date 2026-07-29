@@ -8,9 +8,9 @@ use Websyspro\Server\Includes\Connection;
 class PostgreSQLEngine
 extends AbstractEngine
 {
-  public function extractKey(
-  ): void {
-    $single = Connection::set( $this->schema )->single(
+  public function extractKeyArgs(
+  ): array {
+    return [
       "SELECT information_schema.key_column_usage.column_name
          FROM information_schema.table_constraints
       	     ,information_schema.key_column_usage
@@ -19,14 +19,10 @@ extends AbstractEngine
           AND information_schema.table_constraints.table_schema = CURRENT_SCHEMA()
           AND information_schema.key_column_usage.constraint_name = information_schema.table_constraints.constraint_name 
           AND information_schema.key_column_usage.table_schema  = information_schema.table_constraints.table_schema", [ $this->table ]
-    );
-    
-    if( $single instanceof stdClass ) {
-      $this->key = $single->column_name;
-    }    
+    ];    
   }
 
-  public function extractFieldsArr(
+  public function extractFieldsArgs(
   ): array {
     return [];
   }

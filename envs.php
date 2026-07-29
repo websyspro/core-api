@@ -1,8 +1,8 @@
 <?php
 
 use Websyspro\Server\Commons\Collection;
-use Websyspro\Server\Includes\Enums\DriverSchema;
-use Websyspro\Server\Includes\Enums\DriverType;
+use Websyspro\Server\Includes\Enums\Driver;
+use Websyspro\Server\Includes\Enums\Schema;
 use Websyspro\Server\Includes\Interfaces\AppStructure;
 use Websyspro\Server\Includes\Interfaces\ConnectionDNS;
 
@@ -20,8 +20,8 @@ if( defined( "App" ) === false ){
 if( defined( "CONNECT_LIST" ) === false ){
   define( "CONNECT_LIST", new Collection([
       new ConnectionDNS(
-        schema: DriverSchema::Global, 
-        type: DriverType::MySql,
+        schema: Schema::Global, 
+        driver: Driver::MySql,
         host: "localhost", 
         port: "3306", 
         name: "edocente",
@@ -29,8 +29,8 @@ if( defined( "CONNECT_LIST" ) === false ){
         pass: "qazwsx"
       ),
       new ConnectionDNS(
-        schema: DriverSchema::Crm,
-        type: DriverType::MsSql,
+        schema: Schema::Crm,
+        driver: Driver::MsSql,
         host: "localhost", 
         port: "1433", 
         name: "crm",

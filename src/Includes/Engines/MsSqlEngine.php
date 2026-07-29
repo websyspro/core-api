@@ -2,16 +2,13 @@
 
 namespace Websyspro\Server\Includes\Engines;
 
-use stdClass;
-use Websyspro\Server\Includes\Connection;
-
 class MsSqlEngine
 extends AbstractEngine
 {
-  public function extractKey(
-  ): void {
-    $single = Connection::set( $this->schema )->single(
-      "SELECT kcu.column_name as column_name
+  public function extractKeyArgs(
+  ): array {
+    return [
+			"SELECT kcu.column_name as column_name
 	 			 FROM information_schema.table_constraints tc
 				 JOIN information_schema.key_column_usage kcu
 	  			 ON kcu.constraint_schema = tc.constraint_schema
@@ -29,21 +26,17 @@ extends AbstractEngine
 	 				and a.referenced_object_id=c.object_id 
    			where lower( object_name( parent_object_id )) = lower( ? ))
    	 order by kcu.table_schema, kcu.table_name, kcu.constraint_name", [ $this->table, $this->table ]
-		);
-
-    if( $single instanceof stdClass ) {
-      $this->key = $single->column_name;
-    }
+		];
   }
 
-  public function extractFieldsArr(
+  public function extractFieldsArgs(
   ): array {
-		return Connection::set( $this->schema )->query(
-      "SELECT information_schema.columns.column_name
+		return [
+			"SELECT information_schema.columns.column_name
 		         ,information_schema.columns.data_type
 	       FROM information_schema.columns
 	      WHERE information_schema.columns.table_name = ?
      ORDER BY information_schema.columns.ordinal_position asc ", [ $this->table ]
-    );
+		];
 	}
 }

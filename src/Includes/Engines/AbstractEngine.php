@@ -2,10 +2,12 @@
 
 namespace Websyspro\Server\Includes\Engines;
 
+use stdClass;
 use Websyspro\Server\Commons\Collection;
-use Websyspro\Server\Includes\Enums\DriverSchema;
+use Websyspro\Server\Includes\Connection;
+use Websyspro\Server\Includes\Interfaces\ConnectionDNS;
 use Websyspro\Server\Includes\Interfaces\FieldStructure;
-use function strlen; 
+use function strlen;
 
 abstract class AbstractEngine
 {
@@ -15,7 +17,7 @@ abstract class AbstractEngine
 
   public function __construct(
     public string $sql,
-    protected DriverSchema $schema
+    protected ConnectionDNS $connectionDNS
   ){
     $this->normalizedSql();
     $this->extractTable();
@@ -23,10 +25,10 @@ abstract class AbstractEngine
     $this->extractFields();
   }
 
-  abstract public function extractKey(
-  ): void;
+  abstract public function extractKeyArgs(
+  ): array;
 
-  abstract public function extractFieldsArr(
+  abstract public function extractFieldsArgs(
   ): array;  
 
   public function normalizedSql(   
@@ -63,6 +65,20 @@ abstract class AbstractEngine
     );
   }
 
+  public function extractKey(
+  ): void {
+    [ $sql, $params 
+    ] = $this->extractKeyArgs();
+
+
+    $single = Connection::set( $this->connectionDNS->schema )
+      ->single( $sql, $params );
+
+    if( $single instanceof stdClass ) {
+      $this->key = $single->column_name;
+    }
+  }  
+
   public function validType(
     string $type
   ): string {
@@ -76,8 +92,12 @@ abstract class AbstractEngine
 
   public function extractFields(
   ): void {
+    [ $sql, $params 
+    ] = $this->extractFieldsArgs();
+
     $this->fields = new Collection(
-      $this->extractFieldsArr()
+      Connection::set( $this->connectionDNS->schema )
+        ->query( $sql, $params )
     );
 
     $this->fields = $this->fields->mapper(

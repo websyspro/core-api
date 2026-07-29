@@ -3,20 +3,20 @@
 namespace Websyspro\Server\Includes;
 
 use Exception;
-use JsonSerializable;
+use ReflectionAttribute;
+use ReflectionClass;
+use Websyspro\Server\Includes\Decorators\Database\OriginSchema;
 use Websyspro\Server\Includes\Engines\AbstractEngine;
 use Websyspro\Server\Includes\Engines\MsSqlEngine;
 use Websyspro\Server\Includes\Engines\MySqlEngine;
 use Websyspro\Server\Includes\Engines\PostgreSQLEngine;
 use Websyspro\Server\Includes\Engines\SqliteEngine;
-use Websyspro\Server\Includes\Enums\DriverSchema;
-use Websyspro\Server\Includes\Enums\DriverType;
+use Websyspro\Server\Includes\Enums\Driver;
+use Websyspro\Server\Includes\Enums\Schema;
 
 abstract class QueryView
 {
   public AbstractEngine $engine;
-  protected DriverSchema $schema;
-
   public function __construct(
   ){
     $this->defineEngine();
@@ -24,33 +24,41 @@ abstract class QueryView
 
   abstract public function sql(): string;
 
-  private function defineEngine(
-  ): void {
-    $driverType = Connection::driver(
-      $this->schema
-    );
+  private function defineSchema(
+  ): Schema|null {
+    $attributesArr = (
+      new ReflectionClass($this)
+    )->getAttributes( OriginSchema::class );
 
-    $this->engine = match( $driverType ){
-      DriverType::PostgreSQL => new PostgreSQLEngine( $this->sql(), $this->schema ),
-      DriverType::Sqlite => new SqliteEngine( $this->sql(), $this->schema ),
-      DriverType::MySql => new MySqlEngine( $this->sql(), $this->schema ),
-      DriverType::MsSql => new MsSqlEngine( $this->sql(), $this->schema ),
-        default => throw new Exception( "" )
-    };
+    if( empty( $attributesArr )){
+      new Exception( "Schema not defined" );
+    }
+
+    [ $attribute ] = $attributesArr;
+    if( $attribute instanceof ReflectionAttribute ){
+      $originSchema = $attribute->newInstance();
+      if( $originSchema instanceof OriginSchema ){
+        return $originSchema->schema;
+      }
+    }
+
+    return null;
   }
 
-  /**
-   * Permite serialização JSON automática
-   * Retorna os metadados extraídos pelo Engine
-   */
-  public function jsonSerialize(): array
-  {
-    return [
-      'table'  => $this->engine->table,
-      'key'    => $this->engine->key,
-      'fields' => $this->engine->fields->toArray(),
-      'sql'    => $this->engine->sql,
-      'schema' => $this->schema->name,
-    ];
+  private function defineEngine(
+  ): void {
+    $dns = Connection::connectionDNS(
+      $this->defineSchema()
+    );
+
+    if( $dns->driver === Driver::PostgreSQL ){
+      $this->engine = new PostgreSQLEngine( $this->sql(), $dns );
+    } else if( $dns->driver === Driver::Sqlite ){
+      $this->engine = new SqliteEngine( $this->sql(), $dns );
+    } else if( $dns->driver === Driver::MsSql ){
+      $this->engine = new MsSqlEngine( $this->sql(), $dns );
+    } else if( $dns->driver === Driver::MySql ){
+      $this->engine = new MySqlEngine( $this->sql(), $dns );
+    }
   }
 }

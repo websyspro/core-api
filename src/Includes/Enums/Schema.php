@@ -2,7 +2,7 @@
 
 namespace Websyspro\Server\Includes\Enums;
 
-enum DriverSchema
+enum Schema
 {
   case Global;
   case Crm;

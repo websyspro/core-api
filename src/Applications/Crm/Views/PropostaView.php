@@ -2,14 +2,14 @@
 
 namespace Websyspro\Server\Applications\Crm\Views;
 
-use Websyspro\Server\Includes\Enums\DriverSchema;
+use Websyspro\Server\Includes\Decorators\Database\OriginSchema;
+use Websyspro\Server\Includes\Enums\Schema;
 use Websyspro\Server\Includes\QueryView;
 
-class PropostaView
+#[OriginSchema( Schema::Crm )]
+class PropostaView 
 extends QueryView
 {
-  protected DriverSchema $schema = DriverSchema::Crm;
-
   public function sql(
   ): string {
     return (
