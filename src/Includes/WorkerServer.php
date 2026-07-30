@@ -7,6 +7,7 @@ use ErrorException;
 use ReflectionClass;
 use ReflectionFunction;
 use ReflectionMethod;
+use ReflectionNamedType;
 use Websyspro\Server\Includes\Enums\RequestMethod;
 use Websyspro\Server\Includes\HandleRequest;
 use Websyspro\Server\Includes\Request;
@@ -235,7 +236,7 @@ extends AbstractWorkerServer
             $type = $param->getType();
 
             // Request puro — injeta direto
-            if ($type instanceof \ReflectionNamedType && $type->getName() === Request::class) {
+            if ($type instanceof ReflectionNamedType && $type->getName() === Request::class) {
                 $args[] = $request;
                 continue;
             }
@@ -255,7 +256,7 @@ extends AbstractWorkerServer
                 }
 
                 $key        = $attrs[0]->newInstance()->key;
-                $modelClass = $type instanceof \ReflectionNamedType ? $type->getName() : null;
+                $modelClass = $type instanceof ReflectionNamedType ? $type->getName() : null;
 
                 if ($key !== '') {
                     // key informada — extrai campo especifico da fonte
@@ -289,20 +290,15 @@ extends AbstractWorkerServer
         $request->method, $request->path
       );
 
-      if( $handleMatchResult->closure === null ){
-        return Response::text(
-          "404 - {$request->method} {$request->path} nao encontrado", 404
+      if( $handleMatchResult->isNotExists() === true ){
+        return Response::notFound( 
+          "Route {$request->method} {$request->path} not found"
         );
       }
 
-      $result = $handleMatchResult->execute( $request );
-      if( $result instanceof Response ){
-        return $result;
-      }
-
-      return Response::json( $result );
+      return $handleMatchResult->execute( $request );
     } catch( ErrorException $error ){
-      return Response::text("500 - InternalError", 500);
+      return Response::badRequest( $error->getMessage());
     }
   }
 }

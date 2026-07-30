@@ -2,7 +2,9 @@
 
 namespace Websyspro\Server\Applications\Crm\Controllers;
 
+use stdClass;
 use Websyspro\Server\Applications\Crm\Views\PropostaView;
+use Websyspro\Server\Includes\Decorators\Server\Body;
 use Websyspro\Server\Includes\Decorators\Server\Controller;
 use Websyspro\Server\Includes\Decorators\Server\Get;
 
@@ -15,8 +17,9 @@ class PropostaController
 
   #[Get("/")]
   public function index(
+    #[Body()] array $body
   ): mixed {
-    return "Word!!!";
+    return $body;
     //return new PropostaView();
   }  
 }
