@@ -16,6 +16,7 @@ class PropostaController
   #[Get("/")]
   public function index(
   ): mixed {
-    return new PropostaView();
+    return "Word!!!";
+    //return new PropostaView();
   }  
 }

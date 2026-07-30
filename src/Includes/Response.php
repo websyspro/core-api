@@ -2,98 +2,244 @@
 
 namespace Websyspro\Server\Includes;
 
+use Websyspro\Server\Includes\Enums\Server\HttpStatus;
 use function json_encode;
 use function strlen;
-use function strtolower;
 
 class Response
 {
-    private int    $status;
-    private array  $headers;
-    private string $body;
+  public function __construct(
+    public readonly int $status = 200, 
+    public readonly string $body = "", 
+    public readonly array $headers = []
+  ){}
 
-    public function __construct(int $status = 200, string $body = '', array $headers = [])
-    {
-        $this->status  = $status;
-        $this->body    = $body;
-        $this->headers = $headers;
+  public static function json(
+    mixed $data, 
+    HttpStatus $status = HttpStatus::Ok
+  ): Response {
+    $envelope = json_encode([
+      "success" => $status->value >= 200 && $status->value < 300,
+      "content" => $data,
+    ]);
+
+    return new Response( $status->value, $envelope, [
+      "Content-Type" => "application/json",
+    ]);
+  }
+
+  public static function text(
+    string $text,
+    HttpStatus $status = HttpStatus::Ok
+  ): Response {
+    return new Response( $status->value, $text, [
+      "Content-Type" => "text/plain",
+    ]);
+  }
+
+  public static function html(
+    string $html,
+    HttpStatus $status = HttpStatus::Ok
+  ): Response {
+    return new Response( $status->value, $html, [
+      "Content-Type" => "text/html; charset=utf-8",
+    ]);
+  }
+
+  public static function ok(
+    mixed $data = null
+  ): Response {
+    return Response::json(
+      $data, HttpStatus::Ok
+    );
+  }
+
+  public static function created(
+    mixed $data = null
+  ): Response {
+    return Response::json(
+      $data, HttpStatus::Created
+    );
+  }
+
+  public static function accepted(
+    mixed $data = null
+  ): Response {
+    return Response::json(
+      $data, HttpStatus::Accepted
+    );
+  }
+
+  public static function noContent(
+  ): Response {
+    return new Response(
+      HttpStatus::NoContent->value, "", []
+    );
+  }
+
+  public static function movedPermanently(
+    string $location
+  ): Response {
+    return new Response( HttpStatus::MovedPermanently->value, "", [
+      "Location" => $location,
+    ]);
+  }
+
+  public static function redirect(
+    string $location
+  ): Response {
+    return new Response( 
+      HttpStatus::Found->value, "", [ "Location" => $location ]
+    );
+  }
+
+  public static function notModified(
+  ): Response {
+    return new Response(
+      HttpStatus::NotModified->value, "", []
+    );
+  }
+
+  public static function badRequest(
+    mixed $message = null
+  ): Response {
+    return Response::json(
+      $message ?? "Bad Request", HttpStatus::BadRequest
+    );
+  }
+
+  public static function unauthorized(
+    mixed $message = null
+  ): Response {
+    return Response::json(
+      $message ?? "Unauthorized", HttpStatus::Unauthorized
+    );
+  }
+
+  public static function paymentRequired(
+    mixed $message = null
+  ): Response {
+    return Response::json(
+      $message ?? "Payment Required", HttpStatus::PaymentRequired
+    );
+  }
+
+  public static function forbidden(
+    mixed $message = null
+  ): Response {
+    return Response::json(
+      $message ?? "Forbidden", HttpStatus::Forbidden
+    );
+  }
+
+  public static function notFound(
+    mixed $message = null
+  ): Response {
+    return Response::json(
+      $message ?? "Not Found", HttpStatus::NotFound
+    );
+  }
+
+  public static function methodNotAllowed(
+    mixed $message = null
+  ): Response {
+    return Response::json(
+      $message ?? "Method Not Allowed", HttpStatus::MethodNotAllowed
+    );
+  }
+
+  public static function conflict(
+    mixed $message = null
+  ): Response {
+    return Response::json(
+      $message ?? "Conflict", HttpStatus::Conflict
+    );
+  }
+
+  public static function gone(
+    mixed $message = null
+  ): Response {
+    return Response::json(
+      $message ?? "Gone", HttpStatus::Gone
+    );
+  }
+
+  public static function unprocessableContent(
+    mixed $message = null
+  ): Response {
+    return Response::json(
+      $message ?? "Unprocessable Content", HttpStatus::UnprocessableContent
+    );
+  }
+
+  public static function tooManyRequests(
+    mixed $message = null
+  ): Response {
+    return Response::json(
+      $message ?? "Too Many Requests", HttpStatus::TooManyRequests
+    );
+  }
+
+  public static function internalServerError(
+    mixed $message = null
+  ): Response {
+    return Response::json(
+      $message ?? "Internal Server Error", HttpStatus::InternalServerError
+    );
+  }
+
+  public static function notImplemented(
+    mixed $message = null
+  ): Response {
+    return Response::json(
+      $message ?? "Not Implemented", HttpStatus::NotImplemented
+    );
+  }
+
+  public static function badGateway(
+    mixed $message = null
+  ): Response {
+    return Response::json(
+      $message ?? "Bad Gateway", HttpStatus::BadGateway
+    );
+  }
+
+  public static function serviceUnavailable(
+    mixed $message = null
+  ): Response {
+    return Response::json(
+      $message ?? "Service Unavailable", HttpStatus::ServiceUnavailable
+    );
+  }
+
+  public static function gatewayTimeout(
+    mixed $message = null
+  ): Response {
+    return Response::json(
+      $message ?? "Gateway Timeout", HttpStatus::GatewayTimeout
+    );
+  }
+
+  public function withHeader(
+    string $key, string $value
+  ): Response {
+    $this->headers[$key] = $value;
+    return $this;
+  }
+
+  public function build(
+    bool $keepAlive
+  ): string {
+    $connection = $keepAlive ? "keep-alive" : "close";
+    $statusText = HttpStatus::tryFrom($this->status)?->name ?? "Unknown";
+    $headers    = "HTTP/1.1 {$this->status} $statusText\r\n";
+    $headers   .= "Connection: $connection\r\n";
+    $headers   .= "Content-Length: " . strlen($this->body) . "\r\n";
+
+    foreach ($this->headers as $key => $value) {
+        $headers .= "$key: $value\r\n";
     }
 
-    /**
-     * Resposta JSON — Content-Type: application/json
-     * Formato padrão: { "success": true|false, "content": $data }
-     */
-    public static function json(mixed $data, int $status = 200): static
-    {
-        $envelope = [
-            'success' => $status >= 200 && $status < 300,
-            'content' => $data,
-        ];
-
-        return new static($status, json_encode($envelope), [
-            'Content-Type' => 'application/json',
-        ]);
-    }
-
-    /**
-     * Resposta texto plano — Content-Type: text/plain
-     */
-    public static function text(string $text, int $status = 200): static
-    {
-        return new static($status, $text, [
-            'Content-Type' => 'text/plain',
-        ]);
-    }
-
-    /**
-     * Resposta HTML — Content-Type: text/html
-     */
-    public static function html(string $html, int $status = 200): static
-    {
-        return new static($status, $html, [
-            'Content-Type' => 'text/html; charset=utf-8',
-        ]);
-    }
-
-    /**
-     * Adiciona ou sobrescreve um header na resposta.
-     */
-    public function withHeader(string $key, string $value): static
-    {
-        $this->headers[$key] = $value;
-        return $this;
-    }
-
-    /**
-     * Serializa o Response para string HTTP raw, pronto para enviar pelo socket.
-     */
-    public function build(bool $keepAlive): string
-    {
-        $status     = $this->status;
-        $connection = $keepAlive ? 'keep-alive' : 'close';
-        $headers    = "HTTP/1.1 $status " . $this->statusText() . "\r\n";
-        $headers   .= "Connection: $connection\r\n";
-        $headers   .= "Content-Length: " . strlen($this->body) . "\r\n";
-
-        foreach ($this->headers as $key => $value) {
-            $headers .= "$key: $value\r\n";
-        }
-
-        return "$headers\r\n{$this->body}";
-    }
-
-    private function statusText(): string
-    {
-        return match($this->status) {
-            200 => 'OK',
-            201 => 'Created',
-            204 => 'No Content',
-            400 => 'Bad Request',
-            401 => 'Unauthorized',
-            403 => 'Forbidden',
-            404 => 'Not Found',
-            500 => 'Internal Server Error',
-            default => 'OK',
-        };
-    }
+    return "$headers\r\n{$this->body}";
+  }
 }

@@ -8,6 +8,7 @@ use ReflectionClass;
 use ReflectionFunction;
 use ReflectionMethod;
 use Websyspro\Server\Includes\Enums\RequestMethod;
+use Websyspro\Server\Includes\HandleRequest;
 use Websyspro\Server\Includes\Request;
 use Websyspro\Server\Includes\Response;
 use Websyspro\Server\Includes\Container;
@@ -68,8 +69,9 @@ extends AbstractWorkerServer
 
   private function matchRoute(
     string $method,
-    string $requestPath
-  ): array|null {
+    string $requestPath,
+    array $paramNames = []
+  ): HandleRequest {
     foreach ( $this->routers as $key => $handler ){
       [ $routeMethod, $routePath ] = explode(
         " ", $key, 2
@@ -79,22 +81,24 @@ extends AbstractWorkerServer
         continue;
       }
 
-      $paramNames = [];
       preg_match_all( "#:([a-zA-Z_]+)#", $routePath, $matches );
       $paramNames = $matches[1];
 
       $pattern = preg_replace( "#:([a-zA-Z_]+)#", '([^/]+)', $routePath);
       $pattern = "#^{$pattern}$#";
 
-      if( !preg_match( $pattern, $requestPath, $values )){
+      if((bool)preg_match( $pattern, $requestPath, $values ) === false ){
         continue;
       }
 
-      $params = array_combine( $paramNames, array_slice( $values, 1 )) ?: [];
-      return [ $handler, $params ];
+      return new HandleRequest(
+        $handler, array_combine( 
+          $paramNames, array_slice( $values, 1 )
+        ) ?: []
+      );
     }
-
-    return null;
+    
+    return new HandleRequest();
   }
 
   public function get(
@@ -281,30 +285,23 @@ extends AbstractWorkerServer
     Request $request
   ): Response {
     try {
-      $match = $this->matchRoute(
+      $handleMatchResult = $this->matchRoute(
         $request->method, $request->path
       );
 
-      if( $match === null ){
+      if( $handleMatchResult->closure === null ){
         return Response::text(
           "404 - {$request->method} {$request->path} nao encontrado", 404
         );
       }
 
-      [ $handler, $params ] = $match;
-
-      $result = $handler( ...$this->resolveArgs(
-        $handler, $request->setParams(
-          $params
-        )
-      ));
-
+      $result = $handleMatchResult->execute( $request );
       if( $result instanceof Response ){
         return $result;
       }
 
-      return Response::json($result);
-    } catch(ErrorException $error) {
+      return Response::json( $result );
+    } catch( ErrorException $error ){
       return Response::text("500 - InternalError", 500);
     }
   }
