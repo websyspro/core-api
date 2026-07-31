@@ -2,9 +2,6 @@
 
 namespace Websyspro\Server\Includes\Engines;
 
-use stdClass;
-use Websyspro\Server\Includes\Connection;
-
 class MySqlEngine
 extends AbstractEngine
 {

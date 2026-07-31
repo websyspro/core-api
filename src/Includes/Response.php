@@ -23,12 +23,79 @@ class Response
   ): Response {
     $envelope = json_encode([
       "success" => $status->value >= 200 && $status->value < 300,
-      "content" => $data,
+      "content" => self::normalizeForJson($data),
     ]);
 
     return new Response( $status->value, $envelope, [
       "Content-Type" => "application/json",
     ]);
+  }
+
+  /**
+   * Normaliza dados para serialização JSON
+   * Converte objetos para arrays recursivamente
+   */
+  private static function normalizeForJson(mixed $data): mixed
+  {
+    // Se implementa JsonSerializable, usa o método
+    if ($data instanceof \JsonSerializable) {
+      return $data->jsonSerialize();
+    }
+
+    // Se é um objeto, converte para array
+    if (is_object($data)) {
+      return self::objectToArray($data);
+    }
+
+    // Se é um array, normaliza cada item
+    if (is_array($data)) {
+      return array_map(fn($item) => self::normalizeForJson($item), $data);
+    }
+
+    // Tipos primitivos retornam direto
+    return $data;
+  }
+
+  /**
+   * Converte objeto para array recursivamente
+   */
+  private static function objectToArray(object $obj): array
+  {
+    // Para stdClass, converte diretamente
+    if ($obj instanceof \stdClass) {
+      $result = [];
+      foreach ((array) $obj as $key => $value) {
+        $result[$key] = self::normalizeForJson($value);
+      }
+      return $result;
+    }
+
+    // Para classes com reflection
+    $reflection = new \ReflectionClass($obj);
+    $result = [];
+
+    foreach ($reflection->getProperties() as $property) {
+      // Ignora propriedades protected/private
+      if (!$property->isPublic()) {
+        continue;
+      }
+
+      $property->setAccessible(true);
+      $name = $property->getName();
+      $value = $property->getValue($obj);
+
+      // Converte enums para string
+      if ($value instanceof \BackedEnum) {
+        $result[$name] = $value->value;
+      } elseif ($value instanceof \UnitEnum) {
+        $result[$name] = $value->name;
+      } else {
+        // Recursivo para objetos/arrays aninhados
+        $result[$name] = self::normalizeForJson($value);
+      }
+    }
+
+    return $result;
   }
 
   public static function text(

@@ -2,12 +2,12 @@
 
 namespace Websyspro\Server\Includes\Engines;
 
+use JsonSerializable;
 use stdClass;
 use Websyspro\Server\Commons\Collection;
 use Websyspro\Server\Includes\Connection;
 use Websyspro\Server\Includes\Interfaces\ConnectionDNS;
 use Websyspro\Server\Includes\Interfaces\FieldStructure;
-use Websyspro\Server\Includes\Logger;
 use function strlen;
 
 abstract class AbstractEngine
@@ -20,8 +20,8 @@ abstract class AbstractEngine
 
   public function __construct(
     public string $sql,
-    protected ConnectionDNS $connectionDNS,
-    protected string $viewName = 'cache'
+    protected string $viewName = "cache",
+    protected ConnectionDNS|null $connectionDNS = null
   ){
     $this->normalizedSql();
     $this->hash = md5( $this->sql );
@@ -34,8 +34,8 @@ abstract class AbstractEngine
     }
   }
 
-  private function cacheFile(): string
-  {
+  private function cacheFile(
+  ): string {
     return __DIR__ . "/../../Caches/{$this->viewName}.php";
   }
 
@@ -66,6 +66,7 @@ abstract class AbstractEngine
   }
 
   private function saveToCache(
+    Collection $content = new Collection()
   ): void  {
     $file = $this->cacheFile();
     $dir = dirname( $file );
@@ -74,34 +75,23 @@ abstract class AbstractEngine
       mkdir( $dir, 0755, true );
     }
 
-    $fieldsLines = array_map(
-      fn( FieldStructure $f ) => "    [ 'name' => '{$f->name}', 'type' => '{$f->type}' ]",
-      $this->fields->toArray()
+    $content->add( "<?php" );
+    $content->add( "" );
+    $content->add( "return [" );
+    $content->add( "\t\"hash\" => \"{$this->hash}\"," );
+    $content->add( "\t\"table\" => \"{$this->table}\"," );
+    $content->add( "\t\"key\" => \"{$this->key}\"," );
+    $content->add( "\t\"fields\" => [" );
+    $content->add( $this->fields->mapper(fn( FieldStructure $field ) => (
+      "\t\t[ \"name\" => \"{$field->name}\", \"type\" => \"{$field->type}\" ],"
+    ))->joinWithBreak());
+    $content->add( "\t]" );
+    $content->add( "];" );
+
+
+    file_put_contents(
+      $file, $content->joinWithBreak()
     );
-
-    $fieldsBlock = implode( ",\n", $fieldsLines );
-
-    $content = <<<PHP
-<?php
-
-return [
-  'hash'   => '{$this->hash}',
-  'table'  => '{$this->table}',
-  'key'    => '{$this->key}',
-  'fields' => [
-{$fieldsBlock}
-  ],
-];
-PHP;
-
-    $result = file_put_contents( $file, $content );
-    $name   = basename( $file );
-
-    if( $result === false ){
-      Logger::error( "Cache: falha ao gravar {$name}" );
-    } else {
-      Logger::info( "Cache: gravado {$name}" );
-    }
   }
 
   abstract public function extractKeyArgs(
@@ -149,9 +139,9 @@ PHP;
     [ $sql, $params 
     ] = $this->extractKeyArgs();
 
-
-    $single = Connection::set( $this->connectionDNS->schema )
-      ->single( $sql, $params );
+    $single = Connection::set( 
+      $this->connectionDNS->schema
+    )->single( $sql, $params );
 
     if( $single instanceof stdClass ) {
       $this->key = $single->column_name;

@@ -167,6 +167,14 @@ class Collection
       separator: " ",
       array: $this->items
     );
+  }
+  
+  public function joinWithBreak(
+  ): string {
+    return implode(
+      separator: "\t\r",
+      array: $this->items
+    );
   }  
 
   public static function create(

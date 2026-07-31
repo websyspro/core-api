@@ -4,6 +4,7 @@ namespace Websyspro\Server\Includes;
 
 use Closure;
 use Exception;
+use ReflectionClass;
 use ReflectionFunction;
 use ReflectionNamedType;
 use TypeError;
@@ -51,7 +52,7 @@ class HandleRequest
         Body::class  => $request->body,
         Query::class => $request->query,
         Param::class => $request->params,
-        File::class => $request->files,
+         File::class => $request->files,
       ];
 
       $resolved = false;
@@ -62,15 +63,17 @@ class HandleRequest
         }
 
         $key = $attrs[0]->newInstance()->key;
-        $modelClass = $type instanceof ReflectionNamedType ? $type->getName() : null;
+        $modelClass = $type instanceof ReflectionNamedType 
+          ? $type->getName() : null;
 
         if( $key !== "" ){
           $value = is_array($source) 
             ? ($source[$key] ?? null) : ( is_object( $source ) 
             ? ($source->$key ?? null) : null);
           $args[] = $value;
-        } elseif ($modelClass && is_subclass_of($modelClass, Model::class)) {
-          $args[] = $modelClass::from($source);
+        } elseif ($modelClass) {
+          // Usa ConvertToType para fazer a conversão automática
+          $args[] = ConvertToType::convert($source, $modelClass);
         } else {
           $args[] = $source;
         }

@@ -6,6 +6,8 @@ use ReflectionClass;
 use ReflectionNamedType;
 use function is_object;
 use function array_key_exists;
+use function enum_exists;
+use function is_string;
 
 abstract class Model
 {
@@ -28,7 +30,13 @@ abstract class Model
       $value = $data[ $name ];
 
       if ($type instanceof ReflectionNamedType && !$type->isBuiltin()) {
-        $value = $type->getName()::from($value);
+        $typeName = $type->getName();
+        
+        if (enum_exists($typeName)) {
+          $value = is_string($value) ? $typeName::from($value) : $value;
+        } else {
+          $value = $typeName::from($value);
+        }
       }
 
       $property->setValue(

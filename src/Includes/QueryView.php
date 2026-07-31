@@ -2,28 +2,37 @@
 
 namespace Websyspro\Server\Includes;
 
-use ReflectionClass;
-use ReflectionAttribute;
+use JsonSerializable;
 use Websyspro\Server\Includes\Decorators\Database\OriginSchema;
 use Websyspro\Server\Includes\Exceptions\InternalServerError;
+use Websyspro\Server\Includes\Engines\PostgreSQLEngine;
 use Websyspro\Server\Includes\Engines\AbstractEngine;
+use Websyspro\Server\Includes\Engines\SqliteEngine;
 use Websyspro\Server\Includes\Engines\MsSqlEngine;
 use Websyspro\Server\Includes\Engines\MySqlEngine;
-use Websyspro\Server\Includes\Engines\PostgreSQLEngine;
-use Websyspro\Server\Includes\Engines\SqliteEngine;
 use Websyspro\Server\Includes\Enums\Driver;
 use Websyspro\Server\Includes\Enums\Schema;
+use ReflectionAttribute;
+use ReflectionClass;
 
-abstract class QueryView
+abstract class QueryView implements JsonSerializable
 {
   public AbstractEngine $engine;
   public function __construct(
   ){
     $this->defineEngine();
+    $this->defineRecordSet();
   }
 
   abstract public function sql(
   ): string;
+
+  public function jsonSerialize(): mixed
+  {
+    // Retorna o engine para serialização
+    // O engine deve ter os dados da query
+    return $this->engine;
+  }
 
   private function defineSchema(
   ): Schema|null {
@@ -50,7 +59,7 @@ abstract class QueryView
 
   private function defineEngine(
   ): void {
-    $dns = Connection::connectionDNS( 
+    $connectionDns = Connection::connectionDNS( 
       $this->defineSchema()
     );
 
@@ -59,22 +68,27 @@ abstract class QueryView
       preg_replace( "#([A-Z])#", "-$1", lcfirst( $className ) )
     );
 
-    if( $dns->driver === Driver::PostgreSQL ){
+    if( $connectionDns->driver === Driver::PostgreSQL ){
       $this->engine = new PostgreSQLEngine(
-        $this->sql(), $dns, $cacheName
+        $this->sql(), $cacheName, $connectionDns
       );
-    } else if( $dns->driver === Driver::Sqlite ){
+    } else if( $connectionDns->driver === Driver::Sqlite ){
       $this->engine = new SqliteEngine(
-        $this->sql(), $dns, $cacheName
+        $this->sql(), $cacheName, $connectionDns
       );
-    } else if( $dns->driver === Driver::MsSql ){
+    } else if( $connectionDns->driver === Driver::MsSql ){
       $this->engine = new MsSqlEngine(
-        $this->sql(), $dns, $cacheName
+        $this->sql(), $cacheName, $connectionDns
       );
-    } else if( $dns->driver === Driver::MySql ){
+    } else if( $connectionDns->driver === Driver::MySql ){
       $this->engine = new MySqlEngine(
-        $this->sql(), $dns, $cacheName
+        $this->sql(), $cacheName, $connectionDns
       );
     }
+  }
+
+  private function defineRecordSet(
+  ): void {
+
   }
 }
