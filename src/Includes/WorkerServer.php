@@ -108,7 +108,8 @@ extends AbstractWorkerServer
     Closure $handler
   ): WorkerServer {
     return $this->registerRouter(
-      RequestMethod::GET->value, $path, $handler
+      RequestMethod::GET->value,
+      $path, $handler
     );
   }
 
@@ -117,7 +118,8 @@ extends AbstractWorkerServer
     Closure $handler
   ): WorkerServer {
     return $this->registerRouter(
-      RequestMethod::POST->value, $path, $handler
+      RequestMethod::POST->value, 
+      $path, $handler
     );
   }
 
@@ -125,7 +127,8 @@ extends AbstractWorkerServer
     string $path, Closure $handler
   ): WorkerServer {
     return $this->registerRouter(
-      RequestMethod::PUT->value, $path, $handler
+      RequestMethod::PUT->value,
+      $path, $handler
     );
   }
 
@@ -134,7 +137,8 @@ extends AbstractWorkerServer
     Closure $handler
   ): WorkerServer {
     return $this->registerRouter(
-      RequestMethod::PATCH->value, $path, $handler
+      RequestMethod::PATCH->value,
+      $path, $handler
     );
   }
 
@@ -143,7 +147,8 @@ extends AbstractWorkerServer
     Closure $handler
   ): WorkerServer {
     return $this->registerRouter(
-      RequestMethod::DELETE->name, $path, $handler
+      RequestMethod::DELETE->value,
+      $path, $handler
     );
   }
 

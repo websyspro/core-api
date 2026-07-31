@@ -2,10 +2,10 @@
 
 namespace Websyspro\Server\Includes;
 
-use Exception;
-use ReflectionAttribute;
 use ReflectionClass;
+use ReflectionAttribute;
 use Websyspro\Server\Includes\Decorators\Database\OriginSchema;
+use Websyspro\Server\Includes\Exceptions\InternalServerError;
 use Websyspro\Server\Includes\Engines\AbstractEngine;
 use Websyspro\Server\Includes\Engines\MsSqlEngine;
 use Websyspro\Server\Includes\Engines\MySqlEngine;
@@ -13,7 +13,6 @@ use Websyspro\Server\Includes\Engines\PostgreSQLEngine;
 use Websyspro\Server\Includes\Engines\SqliteEngine;
 use Websyspro\Server\Includes\Enums\Driver;
 use Websyspro\Server\Includes\Enums\Schema;
-use Websyspro\Server\Includes\Exceptions\InternalServerError;
 
 abstract class QueryView
 {
@@ -51,7 +50,10 @@ abstract class QueryView
 
   private function defineEngine(
   ): void {
-    $dns = Connection::connectionDNS( $this->defineSchema() );
+    $dns = Connection::connectionDNS( 
+      $this->defineSchema()
+    );
+
     $className = ( new ReflectionClass($this) )->getShortName();
     $cacheName = "cache-" . strtolower(
       preg_replace( "#([A-Z])#", "-$1", lcfirst( $className ) )

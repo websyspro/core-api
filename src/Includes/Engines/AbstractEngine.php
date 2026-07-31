@@ -39,8 +39,8 @@ abstract class AbstractEngine
     return __DIR__ . "/../../Caches/{$this->viewName}.php";
   }
 
-  private function loadFromCache(): bool
-  {
+  private function loadFromCache(
+  ): bool {
     $file = $this->cacheFile();
 
     if( file_exists( $file ) === false ){
@@ -48,30 +48,29 @@ abstract class AbstractEngine
     }
 
     $cache = require $file;
-
-    // Hash diferente — SQL mudou, precisa regenerar
-    if( ( $cache['hash'] ?? null ) !== $this->hash ){
+    if (($cache[ "hash" ] ?? null ) !== $this->hash) {
       return false;
     }
 
-    $this->table  = $cache['table'];
-    $this->key    = $cache['key'];
+    $this->table = $cache[ "table" ];
+    $this->key = $cache[ "key" ];
     $this->fields = new Collection(
       array_map(
-        fn( array $f ) => new FieldStructure( $f['name'], $f['type'] ),
-        $cache['fields']
+        fn( array $f ) => new FieldStructure(
+          $f['name'], $f['type']
+        ), $cache['fields']
       )
     );
 
     return true;
   }
 
-  private function saveToCache(): void
-  {
+  private function saveToCache(
+  ): void  {
     $file = $this->cacheFile();
-    $dir  = dirname( $file );
+    $dir = dirname( $file );
 
-    if( !is_dir( $dir ) ){
+    if (!is_dir( $dir )) {
       mkdir( $dir, 0755, true );
     }
 
