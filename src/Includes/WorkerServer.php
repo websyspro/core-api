@@ -3,19 +3,13 @@
 namespace Websyspro\Server\Includes;
 
 use Closure;
-use ErrorException;
-use Exception;
 use ReflectionClass;
-use ReflectionFunction;
 use ReflectionMethod;
-use ReflectionNamedType;
 use Websyspro\Server\Includes\Enums\RequestMethod;
-use Websyspro\Server\Includes\Exceptions\NotFound;
 use Websyspro\Server\Includes\HandleRequest;
 use Websyspro\Server\Includes\Request;
 use Websyspro\Server\Includes\Response;
 use Websyspro\Server\Includes\Container;
-use Websyspro\Server\Includes\Model;
 use Websyspro\Server\Includes\Decorators\Server\Authenticate;
 use Websyspro\Server\Includes\Decorators\Server\AllowAnonymous;
 use Websyspro\Server\Includes\Decorators\Server\Controller;
@@ -25,10 +19,6 @@ use Websyspro\Server\Includes\Decorators\Server\Post;
 use Websyspro\Server\Includes\Decorators\Server\Put;
 use Websyspro\Server\Includes\Decorators\Server\Patch;
 use Websyspro\Server\Includes\Decorators\Server\Delete;
-use Websyspro\Server\Includes\Decorators\Server\Body;
-use Websyspro\Server\Includes\Decorators\Server\Query;
-use Websyspro\Server\Includes\Decorators\Server\Param;
-use Websyspro\Server\Includes\Decorators\Server\File;
 use function strtoupper;
 use function explode;
 use function preg_match;
@@ -68,7 +58,10 @@ extends AbstractWorkerServer
         strtoupper( $method ), 
           $this->prefix, $path
       )
-    ] = [ 'handler' => $handler, 'requiresAuth' => $requiresAuth ];
+    ] = [ 
+      "handler" => $handler,
+      "requiresAuth" => $requiresAuth
+    ];
 
     return $this;
   }
@@ -78,12 +71,12 @@ extends AbstractWorkerServer
     string $requestPath,
     array $paramNames = []
   ): HandleRequest {
-    foreach ( $this->routers as $key => $route ){
+    foreach ($this->routers as $key => $route) {
       [ $routeMethod, $routePath ] = explode(
         " ", $key, 2
       );
 
-      if( $routeMethod !== $method ){
+      if ($routeMethod !== $method) {
         continue;
       }
 
@@ -93,14 +86,17 @@ extends AbstractWorkerServer
       $pattern = preg_replace( "#:([a-zA-Z_]+)#", '([^/]+)', $routePath);
       $pattern = "#^{$pattern}$#";
 
-      if((bool)preg_match( $pattern, $requestPath, $values ) === false ){
+      if ((bool)preg_match( $pattern, $requestPath, $values ) === false ) {
         continue;
       }
 
+      [ "handler" => $handler, "requiresAuth" => $requiresAuth
+      ] = $this->routers[$key];
+
       return new HandleRequest(
-        $this->routers[$key]['handler'],
-        array_combine( $paramNames, array_slice( $values, 1 ) ) ?: [],
-        $this->routers[$key]['requiresAuth']
+        $handler, array_combine(
+          $paramNames, array_slice( $values, 1)
+        ) ?: [], $requiresAuth
       );
     }
     
@@ -160,12 +156,14 @@ extends AbstractWorkerServer
         Module::class
       )[0] ?? null;
 
-      if( $moduleAttr === null ){
+      if ($moduleAttr === null) {
         continue;
       }
 
       $module = $moduleAttr->newInstance();
-      $modulePrefix = $module->name !== '' ? '/' . trim($module->name, '/') : '';
+      $modulePrefix = $module->name !== "" 
+        ? "/" . trim($module->name, "/")
+        : "";
 
       // Passagem 1 — cria/sincroniza tabelas sem FKs
       //$schema = SchemaManager::create();
@@ -178,69 +176,91 @@ extends AbstractWorkerServer
           // $schema->applyForeignKeys($entityClass);
       //}
 
-      $this->registerControllers($module->controllers, $modulePrefix);
-      }
+      $this->registerControllers(
+        $modulePrefix,
+        $module->controllers
+      );
+    }
 
+    return $this;
+  }
+
+  public function registerControllers(
+    string $modulePrefix = '',
+    array $controllers = []
+  ): WorkerServer {
+    foreach ($controllers as $controllerClass) {
+      $this->register(
+        $controllerClass, 
+        $modulePrefix
+      );
+    }
+
+    return $this;
+  }
+
+  public function register(
+    string $controllerClass, 
+    string $modulePrefix = ""
+  ): WorkerServer {
+    $reflection = new ReflectionClass($controllerClass);
+    $controllerAttr = $reflection->getAttributes(
+      Controller::class
+    )[0] ?? null;
+
+    if ($controllerAttr === null) {
       return $this;
     }
 
-    public function registerControllers(array $controllers, string $modulePrefix = ''): static
-    {
-        foreach ($controllers as $controllerClass) {
-            $this->register($controllerClass, $modulePrefix);
-        }
-        return $this;
-    }
+    $controllerPath = "/" . trim( $controllerAttr->newInstance()->prefix, "/");
+    $basePath = "{$modulePrefix}{$controllerPath}";
+    $instance = Container::make($controllerClass);
+    $httpAttrs = [ Get::class, Post::class, Put::class, Patch::class, Delete::class ];
 
-    public function register(string $controllerClass, string $modulePrefix = ''): static
-    {
-        $reflection     = new ReflectionClass($controllerClass);
-        $controllerAttr = $reflection->getAttributes(Controller::class)[0] ?? null;
+    $controllerHasAuth = !empty(
+      $reflection->getAttributes(
+        Authenticate::class
+      )
+    );
 
-        if ($controllerAttr === null) {
-            return $this;
-        }
-
-        $controllerPath = '/' . trim($controllerAttr->newInstance()->prefix, '/');
-        $basePath       = $modulePrefix . $controllerPath;
-        $instance       = Container::make($controllerClass);
-        $httpAttrs      = [Get::class, Post::class, Put::class, Patch::class, Delete::class];
-
-        $controllerHasAuth = !empty( $reflection->getAttributes( Authenticate::class ) );
-
-        Logger::info("Controller -> {$reflection->getShortName()}");
-        foreach ($reflection->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
-            foreach ($httpAttrs as $attrClass) {
-                $attrs = $method->getAttributes($attrClass);
-                if (empty($attrs)) {
-                    continue;
-                }
-
-                $subPath    = $attrs[0]->newInstance()->path;
-                $httpMethod = strtoupper((new ReflectionClass($attrClass))->getShortName());
-                $fullPath   = $basePath . ($subPath === '/' ? '' : $subPath);
-                $handler    = Closure::fromCallable([$instance, $method->getName()]);
-
-                $methodHasAllowAnonymous = !empty( $method->getAttributes( AllowAnonymous::class ) );
-                $methodHasAuth           = !empty( $method->getAttributes( Authenticate::class ) );
-
-                // #[AllowAnonymous] no método sempre vence — rota pública mesmo com controller protegido
-                // #[Authenticate] no método → privado
-                // #[Authenticate] no controller → privado (a menos que método tenha AllowAnonymous)
-                $requiresAuth = !$methodHasAllowAnonymous && ( $methodHasAuth || $controllerHasAuth );
-
-                $this->registerRouter($httpMethod, $fullPath, $handler, $requiresAuth);
-            }
+    Logger::info("Controller -> {$reflection->getShortName()}");
+    foreach ($reflection->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
+      foreach ($httpAttrs as $attrClass) {
+        $attrs = $method->getAttributes($attrClass);
+        if (empty($attrs)) {
+            continue;
         }
 
-        return $this;
+        $subPath = $attrs[0]->newInstance()->path;
+        $httpMethod = strtoupper((new ReflectionClass($attrClass))->getShortName());
+        $fullPath = $basePath . ($subPath === "/" ? "" : $subPath);
+        $handler = Closure::fromCallable([$instance, $method->getName()]);
+
+        $methodHasAllowAnonymous = !empty( $method->getAttributes( AllowAnonymous::class ) );
+        $methodHasAuth = !empty( $method->getAttributes( Authenticate::class ) );
+
+        $requiresAuth = !$methodHasAllowAnonymous && (
+          $methodHasAuth || $controllerHasAuth
+        );
+
+        $this->registerRouter(
+          $httpMethod,
+          $fullPath,
+          $handler,
+          $requiresAuth
+        );
+      }
     }
 
+    return $this;
+  }
 
-    public function getRoutes(): array
-    {
-        return array_keys($this->routers);
-    }
+  public function getRoutes(
+  ): array {
+    return array_keys(
+      $this->routers
+    );
+  }
 
   protected function handleRequest(
     Request $request
@@ -250,7 +270,7 @@ extends AbstractWorkerServer
     );
 
     if ($handleMatchResult->isNotExists()) {
-      return throw new NotFound(
+      return Response::notFound( 
         "Route {$request->method} {$request->path} not found"
       );
     }

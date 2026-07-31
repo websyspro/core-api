@@ -6,6 +6,7 @@ use Closure;
 use Exception;
 use ReflectionFunction;
 use ReflectionNamedType;
+use TypeError;
 use Websyspro\Server\Includes\Decorators\Server\Authenticate;
 use Websyspro\Server\Includes\Decorators\Server\Body;
 use Websyspro\Server\Includes\Decorators\Server\File;
@@ -13,9 +14,8 @@ use Websyspro\Server\Includes\Decorators\Server\Param;
 use Websyspro\Server\Includes\Decorators\Server\Query;
 use Websyspro\Server\Includes\Exceptions\HttpException;
 use Websyspro\Server\Includes\Exceptions\InternalServerError;
-use Websyspro\Server\Includes\Enums\Server\HttpStatus;
 use Websyspro\Server\Includes\Request;
-use function call_user_func;
+use function call_user_func_array;
 use function is_array;
 use function is_object;
 
@@ -106,22 +106,19 @@ class HandleRequest
       }
 
       return Response::json( $executeValue );
-    } catch( HttpException $error ){
-      if( $error instanceof InternalServerError ){
-        Logger::error( $error->getMessage() );
-        return Response::json( "Internal Server Error", HttpStatus::InternalServerError );
+    } catch( HttpException $httpException ){
+      if( $httpException instanceof InternalServerError ){
+        Logger::error( $httpException->getMessage() );
+        return Response::internalServerError();
       }
 
-      return Response::json( $error->getMessage(), $error->httpStatus );
-    } catch( Exception $error ){
-      Logger::error( sprintf(
-        "[%s] %s in %s on line %d",
-        get_class( $error ),
-        $error->getMessage(),
-        $error->getFile(),
-        $error->getLine()
-      ));
-      return Response::json( "Internal Server Error", HttpStatus::InternalServerError );
+      return Response::HttpException( $httpException );
+    } catch( TypeError $typeError ){
+      Logger::errorInRuntime( $typeError );
+      return Response::internalServerError();
+    } catch( Exception $exception ){
+      Logger::errorInRuntime( $exception );
+      return Response::internalServerError();
     }
   }
 }

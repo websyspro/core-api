@@ -7,7 +7,7 @@ use Attribute;
 #[Attribute(Attribute::TARGET_PARAMETER)]
 class Param
 {
-    public function __construct(
-        public readonly string $key = ''
-    ) {}
+  public function __construct(
+    public readonly string $key = ""
+  ){}
 }

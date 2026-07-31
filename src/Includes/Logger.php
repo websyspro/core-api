@@ -2,57 +2,88 @@
 
 namespace Websyspro\Server\Includes;
 
+use Exception;
+use TypeError;
 use function date;
 use function microtime;
 use function round;
 use function sprintf;
+use function get_class;
 
 class Logger
 {
-    private static float $lastTime = 0.0;
+  private static float $lastTime = 0.0;
 
-    public static function info(string $message): void
-    {
-        static::log('INFO ', "\033[32m", $message);
-    }
+  public static function info(
+    string $message
+  ): void {
+    Logger::log(
+      "INFO", "\033[32m", $message
+    );
+  }
 
-    public static function error(string $message): void
-    {
-        static::log('ERROR', "\033[31m", $message);
-    }
+  public static function error(
+    string $message
+  ): void {
+    Logger::log(
+      "ERROR", "\033[31m", $message
+    );
+  }
 
-    public static function warn(string $message): void
-    {
-        static::log('WARN ', "\033[33m", $message);
-    }
+  public static function warn(
+    string $message
+  ): void {
+    Logger::log(
+      "WARN", "\033[33m", $message
+    );
+  }
 
-    public static function debug(string $message): void
-    {
-        static::log('DEBUG', "\033[36m", $message);
-    }
+  public static function debug(
+    string $message
+  ): void {
+    Logger::log(
+      "DEBUG", "\033[36m", $message
+    );
+  }
 
-    private static function log(string $level, string $color, string $message): void
-    {
-        $now  = microtime(true);
-        $diff = static::$lastTime > 0
-            ? round(($now - static::$lastTime) * 1000)
-            : 0;
+  public static function errorInRuntime(
+    Exception|TypeError $exception
+  ): void {
+    Logger::error( 
+      sprintf( "[%s] %s in %s on line %d",
+        get_class( $exception ),
+          $exception->getMessage(),
+          $exception->getFile(),
+          $exception->getLine()
+      )
+    );
+  }
 
-        static::$lastTime = $now;
+  private static function log(
+    string $level,
+    string $color,
+    string $message
+  ): void {
+    $now  = microtime(true);
+    $diff = Logger::$lastTime > 0
+      ? round(( $now - Logger::$lastTime ) * 1000)
+      : 0;
 
-        $timestamp = date('Y-m-d H:i:s');
-        $reset     = "\033[0m";
+    Logger::$lastTime = $now;
 
-        echo sprintf(
-            "%s[%s] %s%s %s %s+%sms%s\n",
-            $color,
-            $timestamp,
-            $level,
-            $reset,
-            $message,
-            $color,
-            $diff,
-            $reset
-        );
-    }
+    $timestamp = date( "Y-m-d H:i:s" );
+    $reset = "\033[0m";
+
+    echo sprintf(
+      "%s[%s] %s%s %s %s+%sms%s\n",
+      $color,
+      $timestamp,
+      $level,
+      $reset,
+      $message,
+      $color,
+      $diff,
+      $reset
+    );
+  }
 }

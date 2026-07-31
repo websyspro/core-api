@@ -30,6 +30,7 @@ use function sleep;
 use const WNOHANG;
 use const PHP_OS_FAMILY;
 
+// Define WNOHANG para Windows onde pcntl_* não existe
 abstract class AbstractWorkerServer
 {
   private string $host;
@@ -161,8 +162,11 @@ abstract class AbstractWorkerServer
                   
                   // Popula $_SERVER para compatibilidade com Apache/Nginx
                   [$method, $uri] = explode(' ', $request['firstLine'], 3);
-                  $_SERVER['REQUEST_METHOD'] = $method;
-                  $_SERVER['REQUEST_URI'] = $uri;
+                  
+                  // ⚠️ REMOVIDO: $_SERVER é compartilhado entre requests no mesmo worker
+                  // Usar $request->method e $request->path ao invés de $_SERVER
+                  // $_SERVER['REQUEST_METHOD'] = $method;
+                  // $_SERVER['REQUEST_URI'] = $uri;
                   
                   $connection = $request['headers']['connection'] ?? 'keep-alive';
                   $keepAlive  = strtolower($connection) !== 'close';
@@ -251,46 +255,54 @@ abstract class AbstractWorkerServer
       $this->runWorker(1);
   }
 
-  /**
-   * Modo multi-process para Linux/Mac.
-   * Fork dos workers e master monitorando reinicializacoes.
-   */
-  private function startMultiProcess(): void
-  {
-      Logger::info("Master PID: " . getmypid());
-      Logger::info("Porta: {$this->port}");
-      Logger::info("Workers: {$this->workers}");
-      Logger::info("Keep-Alive: {$this->keepAliveTimeout}s");
-      Logger::info("Max Requests: {$this->maxRequests}");
-      Logger::info("Server running on http://{$this->host}:{$this->port}");
+  private function startMultiProcess(
+  ): void {
+    if( function_exists( "pcntl_fork" )){
+      if( function_exists( "pcntl_wait" )){
+        if (defined( "WNOHANG" ) === false ) {
+            define( "WNOHANG", 1 );
+        }
 
-      for ($i = 0; $i < $this->workers; $i++) {
+        Logger::info( "Master PID: " . getmypid());
+        Logger::info( "Porta: {$this->port}" );
+        Logger::info( "Workers: {$this->workers}" );
+        Logger::info( "Keep-Alive: {$this->keepAliveTimeout}s" );
+        Logger::info( "Max Requests: {$this->maxRequests}" );
+        Logger::info( "Server running on http://{$this->host}:{$this->port}" );
+
+        for ($i = 0; $i < $this->workers; $i++) {
           $pid = pcntl_fork();
           if ($pid === -1) {
-              die("Falha ao criar worker $i\n");
+            die("Falha ao criar worker $i\n");
           }
           if ($pid === 0) {
-              $this->runWorker($i + 1);
-              exit(0);
+            $this->runWorker($i + 1);
+            exit(0);
           }
-          $this->pids[] = $pid;
-      }
 
-      // Loop do master — reinicia workers mortos automaticamente
-      while (true) {
+          $this->pids[] = $pid;
+        }
+
+        while (true) {
           $status = 0;
-          $pid    = pcntl_wait($status, WNOHANG);
+          $pid = pcntl_wait(
+            $status, WNOHANG
+          );
+
           if ($pid > 0) {
-              $idx = array_search($pid, $this->pids);
-              Logger::warn("Worker PID $pid morreu, reiniciando...");
-              $newPid = pcntl_fork();
-              if ($newPid === 0) {
-                  $this->runWorker($idx + 1);
-                  exit(0);
-              }
-              $this->pids[$idx] = $newPid;
+            $idx = array_search( $pid, $this->pids );
+            Logger::warn( "Worker PID $pid morreu, reiniciando..." );
+            $newPid = pcntl_fork();
+            if ($newPid === 0) {
+              $this->runWorker($idx + 1);
+              exit(0);
+            }
+            $this->pids[$idx] = $newPid;
           }
+
           sleep(1);
+        }
       }
+    }
   }
 }

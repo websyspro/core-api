@@ -2,8 +2,11 @@
 
 namespace Websyspro\Server\Includes;
 
+use Websyspro\Server\Commons\Collection;
 use Websyspro\Server\Includes\Enums\Server\HttpStatus;
+use Websyspro\Server\Includes\Exceptions\HttpException;
 use function json_encode;
+use function sprintf;
 use function strlen;
 
 class Response
@@ -188,6 +191,15 @@ class Response
     );
   }
 
+  public static function HttpException(
+    HttpException $httpException
+  ): Response {
+    return Response::json(
+      $httpException->getMessage(),
+      $httpException->httpStatus
+    );
+  }
+
   public static function notImplemented(
     mixed $message = null
   ): Response {
@@ -227,19 +239,66 @@ class Response
     return $this;
   }
 
-  public function build(
+  private function buildConnectionKeepAlive(
     bool $keepAlive
   ): string {
-    $connection = $keepAlive ? "keep-alive" : "close";
-    $statusText = HttpStatus::tryFrom($this->status)?->name ?? "Unknown";
-    $headers    = "HTTP/1.1 {$this->status} $statusText\r\n";
-    $headers   .= "Connection: $connection\r\n";
-    $headers   .= "Content-Length: " . strlen($this->body) . "\r\n";
+    return sprintf(
+      "Connection: %s", $keepAlive
+        ? "keep-alive" : "close"
+    );
+  } 
 
+  private function buildStatusText(
+  ): string {
+    return sprintf(
+      "HTTP/1.1 {$this->status} %s", 
+        HttpStatus::tryFrom( $this->status )->name
+          ?? "Unknown"
+    );
+  }
+
+  private function buildContentLength(
+  ): string {
+    return sprintf(
+      "Content-Length: %s",
+        strlen($this->body)
+    );
+  }
+
+  private function buildAddHeader(
+    string $key,
+    string $value
+  ): string {
+    return sprintf(
+      "%s: %s", $key, $value
+    );
+  }
+  
+  private function buildAddBody(
+  ): string {
+    return sprintf(
+      "\r\n%s", $this->body
+    );
+  }  
+
+  public function build(
+    bool $keepAlive,
+    Collection $builds = new Collection()
+  ): string {
+    $builds->add( $this->buildStatusText());
+    $builds->add( $this->buildConnectionKeepAlive( $keepAlive ));
+    $builds->add( $this->buildContentLength());
+    
     foreach ($this->headers as $key => $value) {
-        $headers .= "$key: $value\r\n";
+      $builds->add(
+        $this->buildAddHeader(
+          $key,
+          $value
+        )
+      );
     }
 
-    return "$headers\r\n{$this->body}";
+    $builds->add( $this->buildAddBody());
+    return $builds->join( "\r\n" );
   }
 }

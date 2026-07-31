@@ -12,10 +12,10 @@ class Authenticate
   public function __construct(
     Request $request
   ) {
-    $authorization = $request->headers['authorization'] ?? null;
+    $authorization = $request->headers[ "authorization" ] ?? null;
 
     if( $authorization === null ){
-      throw new Unauthorized("Token não informado");
+      throw new Unauthorized( "Token não informado" );
     }
   }
 }

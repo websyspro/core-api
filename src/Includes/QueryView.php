@@ -13,6 +13,7 @@ use Websyspro\Server\Includes\Engines\PostgreSQLEngine;
 use Websyspro\Server\Includes\Engines\SqliteEngine;
 use Websyspro\Server\Includes\Enums\Driver;
 use Websyspro\Server\Includes\Enums\Schema;
+use Websyspro\Server\Includes\Exceptions\InternalServerError;
 
 abstract class QueryView
 {
@@ -22,7 +23,8 @@ abstract class QueryView
     $this->defineEngine();
   }
 
-  abstract public function sql(): string;
+  abstract public function sql(
+  ): string;
 
   private function defineSchema(
   ): Schema|null {
@@ -31,7 +33,9 @@ abstract class QueryView
     )->getAttributes( OriginSchema::class );
 
     if( empty( $attributesArr )){
-      new Exception( "Schema not defined" );
+      throw new InternalServerError(
+        "Schema not defined"
+      );
     }
 
     [ $attribute ] = $attributesArr;
@@ -47,18 +51,28 @@ abstract class QueryView
 
   private function defineEngine(
   ): void {
-    $dns       = Connection::connectionDNS( $this->defineSchema() );
+    $dns = Connection::connectionDNS( $this->defineSchema() );
     $className = ( new ReflectionClass($this) )->getShortName();
-    $cacheName = 'cache-' . strtolower( preg_replace( '/([A-Z])/', '-$1', lcfirst( $className ) ) );
+    $cacheName = "cache-" . strtolower(
+      preg_replace( "#([A-Z])#", "-$1", lcfirst( $className ) )
+    );
 
     if( $dns->driver === Driver::PostgreSQL ){
-      $this->engine = new PostgreSQLEngine( $this->sql(), $dns, $cacheName );
+      $this->engine = new PostgreSQLEngine(
+        $this->sql(), $dns, $cacheName
+      );
     } else if( $dns->driver === Driver::Sqlite ){
-      $this->engine = new SqliteEngine( $this->sql(), $dns, $cacheName );
+      $this->engine = new SqliteEngine(
+        $this->sql(), $dns, $cacheName
+      );
     } else if( $dns->driver === Driver::MsSql ){
-      $this->engine = new MsSqlEngine( $this->sql(), $dns, $cacheName );
+      $this->engine = new MsSqlEngine(
+        $this->sql(), $dns, $cacheName
+      );
     } else if( $dns->driver === Driver::MySql ){
-      $this->engine = new MySqlEngine( $this->sql(), $dns, $cacheName );
+      $this->engine = new MySqlEngine(
+        $this->sql(), $dns, $cacheName
+      );
     }
   }
 }

@@ -16,6 +16,7 @@ class PostsController
   ){}
 
   #[Get("/")]
+  #[AllowAnonymous()]
   public function index(
   ): mixed {
     return new PostsView();

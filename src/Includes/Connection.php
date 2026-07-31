@@ -7,10 +7,11 @@ use PDOException;
 use PDOStatement;
 use Websyspro\Server\Includes\Enums\Driver;
 use Websyspro\Server\Includes\Interfaces\ConnectionDNS;
-use Websyspro\Server\Includes\Enums\DriverType;
 use Websyspro\Server\Includes\Enums\Schema;
+use function array_slice;
 use function sprintf;
 use function defined;
+use function count;
 
 class Connection
 {
@@ -42,7 +43,9 @@ class Connection
 	public static function set(
 		Schema $schema
 	): Connection|null {
-		return new static( self::getConnectionDNSBySchema($schema) );
+		return new static( 
+			self::getConnectionDNSBySchema( $schema )
+		);
 	}	
 
 	public static function connectionDNS(
@@ -113,6 +116,14 @@ class Connection
 		];
 	}
 
+	private function statementKey(
+		string $sql
+	): string {
+		return sprintf(
+			"%s:%s", $this->connectionDNS->schema->name, $sql
+		);
+	}
+
   public function query(
 		string $sql,
 		array $params = [],
@@ -121,14 +132,20 @@ class Connection
 	): array|object|null {
 		$this->connect();
 
-		$stmtKey = $this->connectionDNS->schema->name . ':' . $sql;
-		if ( isset( self::$statements[ $stmtKey ]) === false ) {
-			self::$statements[$stmtKey] = self::$handles[
+		$statementKey = $this->statementKey( $sql );
+		if ( isset( self::$statements[ $statementKey ]) === false ) {
+			if (count(self::$statements) > 1000) {
+				self::$statements = array_slice(
+					self::$statements, -500, 500, true
+				);
+			}
+
+			self::$statements[ $statementKey ] = self::$handles[
 				$this->connectionDNS->schema->name
 			]->prepare( $sql );
 		}
 
-		$statements = self::$statements[$stmtKey];
+		$statements = self::$statements[ $statementKey ];
 		if ($statements instanceof PDOStatement) {
 			if ($statements->execute( $params )) {
 				$fetchAll = $single === false
@@ -145,7 +162,9 @@ class Connection
 		string $sql,
 		array $params = []
 	): object|null {
-		return static::query( $sql, $params, true );
+		return static::query( 
+			$sql, $params, true
+		);
   }	
 
 	public function execute(
@@ -155,15 +174,21 @@ class Connection
 	): int {
 		$this->connect();
 		
-		$stmtKey = $this->connectionDNS->schema->name . ':' . $sql;
-		if (!isset(self::$statements[$stmtKey])) {
-			self::$statements[$stmtKey] = self::$handles[
+		$statementKey = $this->statementKey( $sql );
+		if (!isset(self::$statements[$statementKey])) {
+			if (count(self::$statements) > 1000) {
+				self::$statements = array_slice(
+					self::$statements, -500, 500, true
+				);
+			}
+
+			self::$statements[ $statementKey ] = self::$handles[
 				$this->connectionDNS->schema->name
 			]->prepare( $sql );
 		}
 
-		$statements = self::$statements[$stmtKey];
-		if ($statements->execute($params)) {
+		$statements = self::$statements[ $statementKey ];
+		if ($statements->execute( $params )) {
 			$rowCount = $statements->rowCount();
 		}
 		
@@ -171,8 +196,8 @@ class Connection
 		return $rowCount;
 	}
 
-	public function lastInsertId(): string
-	{
+	public function lastInsertId(
+	): string {
 		return $this->connect()->lastInsertId();
 	}
 }
