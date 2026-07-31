@@ -17,7 +17,8 @@ extends QueryView
          FROM Proposta
              ,ItemProposta
     LEFT JOIN Obra on Obra.Id = ItemProposta.ObraId 
-        WHERE ItemProposta.PropostaId  = Proposta.Id"
+        WHERE ItemProposta.PropostaId = Proposta.Id
+          AND 1=1 AND 2=2"
     );
   }
 }

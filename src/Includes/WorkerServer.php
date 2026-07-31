@@ -4,16 +4,20 @@ namespace Websyspro\Server\Includes;
 
 use Closure;
 use ErrorException;
+use Exception;
 use ReflectionClass;
 use ReflectionFunction;
 use ReflectionMethod;
 use ReflectionNamedType;
 use Websyspro\Server\Includes\Enums\RequestMethod;
+use Websyspro\Server\Includes\Exceptions\NotFound;
 use Websyspro\Server\Includes\HandleRequest;
 use Websyspro\Server\Includes\Request;
 use Websyspro\Server\Includes\Response;
 use Websyspro\Server\Includes\Container;
 use Websyspro\Server\Includes\Model;
+use Websyspro\Server\Includes\Decorators\Server\Authenticate;
+use Websyspro\Server\Includes\Decorators\Server\AllowAnonymous;
 use Websyspro\Server\Includes\Decorators\Server\Controller;
 use Websyspro\Server\Includes\Decorators\Server\Module;
 use Websyspro\Server\Includes\Decorators\Server\Get;
@@ -56,14 +60,15 @@ extends AbstractWorkerServer
   private function registerRouter(
     string $method, 
     string $path,
-    Closure $handler
+    Closure $handler,
+    bool $requiresAuth = false
   ): WorkerServer {
     $this->routers[
       sprintf( "%s %s%s", 
         strtoupper( $method ), 
           $this->prefix, $path
       )
-    ] = $handler;
+    ] = [ 'handler' => $handler, 'requiresAuth' => $requiresAuth ];
 
     return $this;
   }
@@ -73,7 +78,7 @@ extends AbstractWorkerServer
     string $requestPath,
     array $paramNames = []
   ): HandleRequest {
-    foreach ( $this->routers as $key => $handler ){
+    foreach ( $this->routers as $key => $route ){
       [ $routeMethod, $routePath ] = explode(
         " ", $key, 2
       );
@@ -93,9 +98,9 @@ extends AbstractWorkerServer
       }
 
       return new HandleRequest(
-        $handler, array_combine( 
-          $paramNames, array_slice( $values, 1 )
-        ) ?: []
+        $this->routers[$key]['handler'],
+        array_combine( $paramNames, array_slice( $values, 1 ) ) ?: [],
+        $this->routers[$key]['requiresAuth']
       );
     }
     
@@ -201,6 +206,8 @@ extends AbstractWorkerServer
         $instance       = Container::make($controllerClass);
         $httpAttrs      = [Get::class, Post::class, Put::class, Patch::class, Delete::class];
 
+        $controllerHasAuth = !empty( $reflection->getAttributes( Authenticate::class ) );
+
         Logger::info("Controller -> {$reflection->getShortName()}");
         foreach ($reflection->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
             foreach ($httpAttrs as $attrClass) {
@@ -214,7 +221,15 @@ extends AbstractWorkerServer
                 $fullPath   = $basePath . ($subPath === '/' ? '' : $subPath);
                 $handler    = Closure::fromCallable([$instance, $method->getName()]);
 
-                $this->registerRouter($httpMethod, $fullPath, $handler);
+                $methodHasAllowAnonymous = !empty( $method->getAttributes( AllowAnonymous::class ) );
+                $methodHasAuth           = !empty( $method->getAttributes( Authenticate::class ) );
+
+                // #[AllowAnonymous] no método sempre vence — rota pública mesmo com controller protegido
+                // #[Authenticate] no método → privado
+                // #[Authenticate] no controller → privado (a menos que método tenha AllowAnonymous)
+                $requiresAuth = !$methodHasAllowAnonymous && ( $methodHasAuth || $controllerHasAuth );
+
+                $this->registerRouter($httpMethod, $fullPath, $handler, $requiresAuth);
             }
         }
 
@@ -227,78 +242,19 @@ extends AbstractWorkerServer
         return array_keys($this->routers);
     }
 
-    private function resolveArgs(Closure $handler, Request $request): array
-    {
-        $reflection = new ReflectionFunction($handler);
-        $args       = [];
-
-        foreach ($reflection->getParameters() as $param) {
-            $type = $param->getType();
-
-            // Request puro — injeta direto
-            if ($type instanceof ReflectionNamedType && $type->getName() === Request::class) {
-                $args[] = $request;
-                continue;
-            }
-
-            $sourceMap = [
-                Body::class  => $request->body,
-                Query::class => $request->query,
-                Param::class => $request->params,
-                File::class  => $request->files,
-            ];
-
-            $resolved = false;
-            foreach ($sourceMap as $attrClass => $source) {
-                $attrs = $param->getAttributes($attrClass);
-                if (empty($attrs)) {
-                    continue;
-                }
-
-                $key        = $attrs[0]->newInstance()->key;
-                $modelClass = $type instanceof ReflectionNamedType ? $type->getName() : null;
-
-                if ($key !== '') {
-                    // key informada — extrai campo especifico da fonte
-                    $value  = is_array($source) ? ($source[$key] ?? null) : (is_object($source) ? ($source->$key ?? null) : null);
-                    $args[] = $value;
-                } elseif ($modelClass && is_subclass_of($modelClass, Model::class)) {
-                    // sem key + Model — hidrata o model com toda a fonte
-                    $args[] = $modelClass::from($source);
-                } else {
-                    // sem key + tipo primitivo — passa a fonte inteira
-                    $args[] = $source;
-                }
-
-                $resolved = true;
-                break;
-            }
-
-            if (!$resolved) {
-                $args[] = null;
-            }
-        }
-
-        return $args;
-    }
-
   protected function handleRequest(
     Request $request
   ): Response {
-    try {
-      $handleMatchResult = $this->matchRoute(
-        $request->method, $request->path
+    $handleMatchResult = $this->matchRoute(
+      $request->method, $request->path
+    );
+
+    if ($handleMatchResult->isNotExists()) {
+      return throw new NotFound(
+        "Route {$request->method} {$request->path} not found"
       );
-
-      if( $handleMatchResult->isNotExists() === true ){
-        return Response::notFound( 
-          "Route {$request->method} {$request->path} not found"
-        );
-      }
-
-      return $handleMatchResult->execute( $request );
-    } catch( ErrorException $error ){
-      return Response::badRequest( $error->getMessage());
     }
+
+    return $handleMatchResult->execute( $request );
   }
 }

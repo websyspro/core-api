@@ -6,10 +6,14 @@ use Closure;
 use Exception;
 use ReflectionFunction;
 use ReflectionNamedType;
+use Websyspro\Server\Includes\Decorators\Server\Authenticate;
 use Websyspro\Server\Includes\Decorators\Server\Body;
 use Websyspro\Server\Includes\Decorators\Server\File;
 use Websyspro\Server\Includes\Decorators\Server\Param;
 use Websyspro\Server\Includes\Decorators\Server\Query;
+use Websyspro\Server\Includes\Exceptions\HttpException;
+use Websyspro\Server\Includes\Exceptions\InternalServerError;
+use Websyspro\Server\Includes\Enums\Server\HttpStatus;
 use Websyspro\Server\Includes\Request;
 use function call_user_func;
 use function is_array;
@@ -19,7 +23,8 @@ class HandleRequest
 {
   public function __construct(
     public readonly Closure|null $closure = null,
-    public readonly array|null $params = null
+    public readonly array|null   $params = null,
+    public readonly bool         $requiresAuth = false
   ){}
 
   public function isNotExists(
@@ -85,24 +90,38 @@ class HandleRequest
   public function execute(
     Request $request
   ): Response {
-    if( $this->closure instanceof Closure ){
-      try {
-        $executeValue = @call_user_func( 
-          $this->closure, $this->resolveArgs(
-            $this->closure, $request->setParams( $this->params )
-          )
-        );
-
-        if( $executeValue instanceof Response ){
-          return $executeValue;
-        }
-
-        return Response::json( $executeValue );
-      } catch( Exception $error ){
-        return Response::badRequest( $error->getMessage() );
+    try {
+      if( $this->requiresAuth ){
+        new Authenticate( $request );
       }
-    }
 
-    return Response::noContent();
+      $executeValue = call_user_func_array( 
+        $this->closure, $this->resolveArgs(
+          $this->closure, $request->setParams( $this->params )
+        )
+      );
+
+      if( $executeValue instanceof Response ){
+        return $executeValue;
+      }
+
+      return Response::json( $executeValue );
+    } catch( HttpException $error ){
+      if( $error instanceof InternalServerError ){
+        Logger::error( $error->getMessage() );
+        return Response::json( "Internal Server Error", HttpStatus::InternalServerError );
+      }
+
+      return Response::json( $error->getMessage(), $error->httpStatus );
+    } catch( Exception $error ){
+      Logger::error( sprintf(
+        "[%s] %s in %s on line %d",
+        get_class( $error ),
+        $error->getMessage(),
+        $error->getFile(),
+        $error->getLine()
+      ));
+      return Response::json( "Internal Server Error", HttpStatus::InternalServerError );
+    }
   }
 }

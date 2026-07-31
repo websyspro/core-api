@@ -2,13 +2,16 @@
 
 namespace Websyspro\Server\Applications\Crm\Controllers;
 
-use stdClass;
 use Websyspro\Server\Applications\Crm\Views\PropostaView;
+use Websyspro\Server\Includes\Decorators\Server\AllowAnonymous;
+use Websyspro\Server\Includes\Decorators\Server\Authenticate;
 use Websyspro\Server\Includes\Decorators\Server\Body;
 use Websyspro\Server\Includes\Decorators\Server\Controller;
 use Websyspro\Server\Includes\Decorators\Server\Get;
+use Websyspro\Server\Includes\Decorators\Server\Query;
+use Websyspro\Server\Includes\Exceptions\InternalServerError;
 
-
+#[Authenticate()]
 #[Controller("proposta")]
 class PropostaController
 {
@@ -16,10 +19,15 @@ class PropostaController
   ){}
 
   #[Get("/")]
+  #[AllowAnonymous()]
   public function index(
-    #[Body()] array $body
+    #[Body()] object $body,
+    #[Query("isError")] int $isError
   ): mixed {
-    return $body;
-    //return new PropostaView();
+    if( $isError === 1 ){
+      throw new InternalServerError("Erro de teste no controller");
+    }
+
+    return new PropostaView();
   }  
 }

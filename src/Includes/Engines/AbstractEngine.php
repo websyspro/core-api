@@ -7,6 +7,7 @@ use Websyspro\Server\Commons\Collection;
 use Websyspro\Server\Includes\Connection;
 use Websyspro\Server\Includes\Interfaces\ConnectionDNS;
 use Websyspro\Server\Includes\Interfaces\FieldStructure;
+use Websyspro\Server\Includes\Logger;
 use function strlen;
 
 abstract class AbstractEngine
@@ -15,14 +16,93 @@ abstract class AbstractEngine
   public string $table;
   public Collection $fields;
 
+  private string $hash;
+
   public function __construct(
     public string $sql,
-    protected ConnectionDNS $connectionDNS
+    protected ConnectionDNS $connectionDNS,
+    protected string $viewName = 'cache'
   ){
     $this->normalizedSql();
-    $this->extractTable();
-    $this->extractKey();
-    $this->extractFields();
+    $this->hash = md5( $this->sql );
+
+    if( $this->loadFromCache() === false ){
+      $this->extractTable();
+      $this->extractKey();
+      $this->extractFields();
+      $this->saveToCache();
+    }
+  }
+
+  private function cacheFile(): string
+  {
+    return __DIR__ . "/../../Caches/{$this->viewName}.php";
+  }
+
+  private function loadFromCache(): bool
+  {
+    $file = $this->cacheFile();
+
+    if( file_exists( $file ) === false ){
+      return false;
+    }
+
+    $cache = require $file;
+
+    // Hash diferente — SQL mudou, precisa regenerar
+    if( ( $cache['hash'] ?? null ) !== $this->hash ){
+      return false;
+    }
+
+    $this->table  = $cache['table'];
+    $this->key    = $cache['key'];
+    $this->fields = new Collection(
+      array_map(
+        fn( array $f ) => new FieldStructure( $f['name'], $f['type'] ),
+        $cache['fields']
+      )
+    );
+
+    return true;
+  }
+
+  private function saveToCache(): void
+  {
+    $file = $this->cacheFile();
+    $dir  = dirname( $file );
+
+    if( !is_dir( $dir ) ){
+      mkdir( $dir, 0755, true );
+    }
+
+    $fieldsLines = array_map(
+      fn( FieldStructure $f ) => "    [ 'name' => '{$f->name}', 'type' => '{$f->type}' ]",
+      $this->fields->toArray()
+    );
+
+    $fieldsBlock = implode( ",\n", $fieldsLines );
+
+    $content = <<<PHP
+<?php
+
+return [
+  'hash'   => '{$this->hash}',
+  'table'  => '{$this->table}',
+  'key'    => '{$this->key}',
+  'fields' => [
+{$fieldsBlock}
+  ],
+];
+PHP;
+
+    $result = file_put_contents( $file, $content );
+    $name   = basename( $file );
+
+    if( $result === false ){
+      Logger::error( "Cache: falha ao gravar {$name}" );
+    } else {
+      Logger::info( "Cache: gravado {$name}" );
+    }
   }
 
   abstract public function extractKeyArgs(
