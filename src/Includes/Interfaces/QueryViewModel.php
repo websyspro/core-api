@@ -14,5 +14,6 @@ class QueryViewModel
     public readonly object|null $order = null,
     public readonly object|null $where = null,
     public readonly array|null $rows = [],
+    public readonly QueryTestViewModel|null $queryTestViewModel = null,
   ){}
 }
