@@ -28,4 +28,20 @@ extends AbstractEngine
      ORDER BY information_schema.columns.ordinal_position asc", [ $this->table ]
     ];
   }
+
+  public function extractCountRows(
+	): string {
+		return sprintf(
+			"SELECT count(*) as numRows FROM %s", $this->table
+		);
+	} 
+
+  public function applyWhere(
+  ): void {}
+
+  public function applyOrderBy(
+  ): void {}
+  
+  public function applyLimits(
+  ): void  {}  
 }

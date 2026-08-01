@@ -321,14 +321,22 @@ class ConvertToType
     foreach ($reflection->getProperties() as $property) {
       $name = $property->getName();
 
+      $property->setAccessible(true);
+
+      // Se $source não tem a propriedade → seta null apenas se o tipo aceitar
       if (!array_key_exists($name, $data)) {
+        if (!$property->isInitialized($instance)) {
+          $type = $property->getType();
+          // só seta null se tipo permite nullable ou não tem tipo declarado
+          if ($type === null || $type->allowsNull()) {
+            $property->setValue($instance, null);
+          }
+        }
         continue;
       }
 
-      $property->setAccessible(true);
       $value = $data[$name];
-
-      $type = $property->getType();
+      $type  = $property->getType();
 
       if ($type instanceof ReflectionNamedType) {
         $typeName = $type->getName();

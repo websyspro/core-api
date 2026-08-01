@@ -2,9 +2,9 @@
 
 namespace Websyspro\Server\Includes;
 
-use JsonSerializable;
 use Websyspro\Server\Includes\Decorators\Database\OriginSchema;
 use Websyspro\Server\Includes\Exceptions\InternalServerError;
+use Websyspro\Server\Includes\Interfaces\QueryProps;
 use Websyspro\Server\Includes\Engines\PostgreSQLEngine;
 use Websyspro\Server\Includes\Engines\AbstractEngine;
 use Websyspro\Server\Includes\Engines\SqliteEngine;
@@ -15,10 +15,11 @@ use Websyspro\Server\Includes\Enums\Schema;
 use ReflectionAttribute;
 use ReflectionClass;
 
-abstract class QueryView implements JsonSerializable
+abstract class QueryView
 {
   public AbstractEngine $engine;
   public function __construct(
+    public readonly QueryProps $queryProps
   ){
     $this->defineEngine();
     $this->defineRecordSet();
@@ -26,13 +27,6 @@ abstract class QueryView implements JsonSerializable
 
   abstract public function sql(
   ): string;
-
-  public function jsonSerialize(): mixed
-  {
-    // Retorna o engine para serialização
-    // O engine deve ter os dados da query
-    return $this->engine;
-  }
 
   private function defineSchema(
   ): Schema|null {

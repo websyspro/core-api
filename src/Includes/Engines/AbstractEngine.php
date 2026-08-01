@@ -2,7 +2,6 @@
 
 namespace Websyspro\Server\Includes\Engines;
 
-use JsonSerializable;
 use stdClass;
 use Websyspro\Server\Commons\Collection;
 use Websyspro\Server\Includes\Connection;
@@ -15,23 +14,18 @@ abstract class AbstractEngine
   public string $key;
   public string $table;
   public Collection $fields;
-
   private string $hash;
+
+  public int $numRows;
+  public Collection $rows;
 
   public function __construct(
     public string $sql,
     protected string $viewName = "cache",
     protected ConnectionDNS|null $connectionDNS = null
   ){
-    $this->normalizedSql();
-    $this->hash = md5( $this->sql );
-
-    if( $this->loadFromCache() === false ){
-      $this->extractTable();
-      $this->extractKey();
-      $this->extractFields();
-      $this->saveToCache();
-    }
+    $this->extractBase();
+    $this->extractRecordSet();
   }
 
   private function cacheFile(
@@ -176,6 +170,43 @@ abstract class AbstractEngine
           $field->data_type
         )
       )
+    );
+  }
+
+  private function extractBase(
+  ): void {
+    $this->normalizedSql();
+    $this->hash = md5( $this->sql );
+
+    if( $this->loadFromCache() === false ){
+      $this->extractTable();
+      $this->extractKey();
+      $this->extractFields();
+      $this->saveToCache();
+    }
+  }
+
+  abstract public function extractCountRows(
+  ): string;  
+
+  abstract public function applyWhere(
+  ): void;
+
+  abstract public function applyOrderBy(
+  ): void;
+  
+  abstract public function applyLimits(
+  ): void;
+
+  public function extractRecordSet(
+  ): void {
+    $this->numRows = Connection::set( $this->connectionDNS->schema)
+        ->single( $this->sql )
+        ->numRows;
+
+    $this->rows = new Collection(
+      Connection::set( $this->connectionDNS->schema)
+        ->query( $this->sql )
     );
   }
 }
