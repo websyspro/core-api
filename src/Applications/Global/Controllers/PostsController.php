@@ -20,7 +20,9 @@ class PostsController
   #[Get("/")]
   #[AllowAnonymous()]
   public function index(
-    #[Body()] QueryViewModel $queryViewModel
+    #[Body()] QueryViewModel $queryViewModel,
+    //#[Body()] object $username,
+    //#[Body("username")] string $username
   ): mixed {
     return $queryViewModel;
     // return new PostsView();
