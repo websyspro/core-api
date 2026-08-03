@@ -74,6 +74,23 @@ class Logger
     $timestamp = date( "Y-m-d H:i:s" );
     $reset = "\033[0m";
 
+    $line = sprintf(
+      "[%s] %s %s +%sms",
+      $timestamp,
+      $level,
+      $message,
+      $diff
+    );
+
+    // No modo Apache/FPM não pode fazer echo antes dos headers
+    // redireciona para error_log (aparece no error.log do Apache/PHP)
+    if (defined("APP") && APP instanceof \Websyspro\Server\Includes\Interfaces\AppStructure
+      && APP->serviceType === \Websyspro\Server\Includes\Enums\ServiceType::Apache
+    ) {
+      error_log($line);
+      return;
+    }
+
     echo sprintf(
       "%s[%s] %s%s %s %s+%sms%s\n",
       $color,

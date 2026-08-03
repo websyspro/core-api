@@ -6,6 +6,7 @@ use Closure;
 use ReflectionClass;
 use ReflectionMethod;
 use Websyspro\Server\Includes\Enums\RequestMethod;
+use Websyspro\Server\Includes\Enums\ServiceType;
 use Websyspro\Server\Includes\HandleRequest;
 use Websyspro\Server\Includes\Request;
 use Websyspro\Server\Includes\Response;
@@ -265,6 +266,85 @@ extends AbstractWorkerServer
     return array_keys(
       $this->routers
     );
+  }
+
+  public function start(
+  ): void {
+    APP->serviceType === ServiceType::Apache
+      ? $this->startApache()
+      : $this->startTcp();
+  }
+
+  private function startApache(
+  ): void {
+    $method   = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
+    $uri      = $_SERVER['REQUEST_URI'] ?? '/';
+    $headers  = $this->apacheGetHeaders();
+    $protocol = $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.1';
+
+    $contentType = strtolower($headers['content-type'] ?? '');
+
+    if (str_contains($contentType, 'multipart/form-data')) {
+      $rawBody = '';
+    } else {
+      $rawBody = file_get_contents('php://input') ?: '';
+    }
+
+    $firstLine = sprintf('%s %s %s', $method, $uri, $protocol);
+
+    $parsed = [
+      'firstLine' => $firstLine,
+      'headers'   => $headers,
+      'body'      => $rawBody,
+      'remaining' => '',
+    ];
+
+    // Injeta $_POST e $_FILES no $parsed para o construtor do Request
+    if (str_contains($contentType, 'multipart/form-data')) {
+      $parsed['apachePost']  = $_POST;
+      $parsed['apacheFiles'] = $_FILES;
+    }
+
+    $request  = new Request($parsed);
+    $response = $this->handleRequest($request);
+
+    http_response_code($response->status);
+
+    foreach ($response->headers as $key => $value) {
+      header(sprintf('%s: %s', $key, $value));
+    }
+
+    echo $response->body;
+  }
+
+  private function apacheGetHeaders(
+  ): array {
+    $headers = [];
+
+    if (function_exists('getallheaders')) {
+      foreach (getallheaders() as $name => $value) {
+        $headers[strtolower($name)] = $value;
+      }
+      return $headers;
+    }
+
+    // Fallback via $_SERVER para CGI/outros SAPIs
+    foreach ($_SERVER as $key => $value) {
+      if (str_starts_with($key, 'HTTP_')) {
+        $name = strtolower(str_replace('_', '-', substr($key, 5)));
+        $headers[$name] = $value;
+      }
+    }
+
+    if (isset($_SERVER['CONTENT_TYPE'])) {
+      $headers['content-type'] = $_SERVER['CONTENT_TYPE'];
+    }
+
+    if (isset($_SERVER['CONTENT_LENGTH'])) {
+      $headers['content-length'] = $_SERVER['CONTENT_LENGTH'];
+    }
+
+    return $headers;
   }
 
   protected function handleRequest(

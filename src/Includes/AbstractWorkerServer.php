@@ -210,10 +210,10 @@ abstract class AbstractWorkerServer
   }
 
   /**
-   * Inicia o servidor: cria o socket, faz fork dos workers e
+   * Inicia o servidor TCP: cria o socket, faz fork dos workers e
    * mantém o master monitorando e reiniciando workers mortos.
    */
-  public function start(): void
+  public function startTcp(): void
   {
       $this->server = stream_socket_server(
           "tcp://{$this->host}:{$this->port}",

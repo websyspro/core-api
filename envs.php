@@ -3,6 +3,7 @@
 use Websyspro\Server\Commons\Collection;
 use Websyspro\Server\Includes\Enums\Driver;
 use Websyspro\Server\Includes\Enums\Schema;
+use Websyspro\Server\Includes\Enums\ServiceType;
 use Websyspro\Server\Includes\Interfaces\AppStructure;
 use Websyspro\Server\Includes\Interfaces\ConnectionDNS;
 
@@ -17,7 +18,8 @@ if( defined( "APP" ) === false ){
     maxRequests: 1000,
     keepAliveTimeOut: 30,
     host: PHP_OS_FAMILY === "Windows" ? "localhost" : "localhost",
-    workers: max(1, (int) shell_exec( "nproc" ))
+    workers: max(1, (int) shell_exec( "nproc" )),
+    serviceType: ServiceType::Tcp
   ));
 }
 

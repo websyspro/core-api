@@ -2,6 +2,8 @@
 
 namespace Websyspro\Server\Includes\Interfaces;
 
+use Websyspro\Server\Includes\Enums\ServiceType;
+
 class AppStructure
 {
   public function __construct(
@@ -11,5 +13,6 @@ class AppStructure
     public readonly int $keepAliveTimeOut,
     public readonly int $maxRequests,
     public readonly int $workers,
+    public readonly ServiceType $serviceType = ServiceType::Tcp,
   ){}
 }
