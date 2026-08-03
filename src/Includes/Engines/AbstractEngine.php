@@ -5,32 +5,51 @@ namespace Websyspro\Server\Includes\Engines;
 use stdClass;
 use Websyspro\Server\Commons\Collection;
 use Websyspro\Server\Includes\Connection;
+use Websyspro\Server\Includes\Enums\Query\EqualType;
 use Websyspro\Server\Includes\Interfaces\ConnectionDNS;
 use Websyspro\Server\Includes\Interfaces\FieldStructure;
+use Websyspro\Server\Includes\Interfaces\WhereField;
+use Websyspro\Server\Includes\Interfaces\QueryProps;
 use function strlen;
+use function sprintf;
 
 abstract class AbstractEngine
 {
   public string $key;
   public string $table;
   public Collection $fields;
+  public Collection $whereField;
   private string $hash;
 
-  public int $numRows;
-  public Collection $rows;
+  // public int $numRows;
+  // public Collection $rows;
 
   public function __construct(
     public string $sql,
     protected string $viewName = "cache",
-    protected ConnectionDNS|null $connectionDNS = null
+    protected readonly QueryProps|null $queryProps = null,
+    protected readonly ConnectionDNS|null $connectionDNS = null
   ){
     $this->extractBase();
     $this->extractRecordSet();
   }
 
+  private function db(
+  ): Connection|null {
+    if ($this->connectionDNS == null) {
+      return null;
+    }
+
+    return Connection::set(
+      $this->connectionDNS->schema
+    );
+  }
+
   private function cacheFile(
   ): string {
-    return __DIR__ . "/../../Caches/{$this->viewName}.php";
+    return sprintf(
+       "%ssrc/Caches/%s.php", ROOT, $this->viewName
+    );
   }
 
   private function loadFromCache(
@@ -133,9 +152,9 @@ abstract class AbstractEngine
     [ $sql, $params 
     ] = $this->extractKeyArgs();
 
-    $single = Connection::set( 
-      $this->connectionDNS->schema
-    )->single( $sql, $params );
+    $single = $this->db()->single(
+      $sql, $params
+    );
 
     if( $single instanceof stdClass ) {
       $this->key = $single->column_name;
@@ -146,9 +165,12 @@ abstract class AbstractEngine
     string $type
   ): string {
 		return match( $type ){
-      "datetime2" => "datetime",
-      "bigint", "int" => "integer",
-      "uniqueidentifier", "longtext", "varchar" => "text",
+      "datetime2", "datetime", "date", "time" 
+        => "date",
+      "bigint", "int" 
+        => "integer",
+      "uniqueidentifier", "longtext", "varchar" 
+        => "text",
         default => $type
     };
 	}  
@@ -159,8 +181,7 @@ abstract class AbstractEngine
     ] = $this->extractFieldsArgs();
 
     $this->fields = new Collection(
-      Connection::set( $this->connectionDNS->schema )
-        ->query( $sql, $params )
+      $this->db()->query( $sql, $params )
     );
 
     $this->fields = $this->fields->mapper(
@@ -189,8 +210,49 @@ abstract class AbstractEngine
   abstract public function extractCountRows(
   ): string;  
 
-  abstract public function applyWhere(
-  ): void;
+  public function applyWhere(
+    string|null $equalType = null
+  ): void {
+    if ($this->queryProps->where === null) {
+			$this->sql = sprintf(
+				"SELECT * FROM (%s) AS %s WHERE 1=1", $this->sql, $this->table
+			);
+		} else {
+			foreach( $this->queryProps->where as $name => $text ){
+        $fieldStructure = $this->fields->where(
+          fn( FieldStructure $fieldStrucuture )=> (
+            $fieldStrucuture->name === $name
+          ) 
+        );
+
+        if( $fieldStructure->exist()){
+          if( isset( $this->whereField ) === false ){
+            $this->whereField = new Collection();
+          }
+
+          if ((bool)preg_match( "#\[(?:,|:)\]#", $text )) {
+            if ((bool)preg_match( "#\[:]#", $text )) {
+              $equalType = EqualType::Interval;
+            } else 
+            if ((bool)preg_match( "#\[,]#", $text )) {
+              $equalType = EqualType::List;
+            }
+          } else {
+            $equalType = EqualType::Equal;
+          }
+
+          $this->whereField->add(
+            new WhereField(
+              table: $this->table, field: $name,
+              equalType: $equalType,
+              callbacks: [],
+              values: [] 
+            )
+          );
+        }
+			}
+		}
+  }
 
   abstract public function applyOrderBy(
   ): void;
@@ -200,13 +262,5 @@ abstract class AbstractEngine
 
   public function extractRecordSet(
   ): void {
-    $this->numRows = Connection::set( $this->connectionDNS->schema)
-        ->single( $this->sql )
-        ->numRows;
-
-    $this->rows = new Collection(
-      Connection::set( $this->connectionDNS->schema)
-        ->query( $this->sql )
-    );
   }
 }

@@ -2,6 +2,8 @@
 
 namespace Websyspro\Server\Includes\Engines;
 
+use Websyspro\Server\Includes\Interfaces\QueryProps;
+
 class SqliteEngine
 extends AbstractEngine
 {
@@ -22,9 +24,6 @@ extends AbstractEngine
 		);
 	}  
   
-  public function applyWhere(
-  ): void {}
-
   public function applyOrderBy(
   ): void {}
   

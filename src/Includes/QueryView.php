@@ -57,32 +57,33 @@ abstract class QueryView
       $this->defineSchema()
     );
 
-    $className = ( new ReflectionClass($this) )->getShortName();
-    $cacheName = "cache-" . strtolower(
-      preg_replace( "#([A-Z])#", "-$1", lcfirst( $className ) )
+    $cacheName = "cache" . strtolower(
+      preg_replace( "#([A-Z])#", "-$1", (
+        new ReflectionClass($this)
+      )->getShortName() )
     );
 
     if( $connectionDns->driver === Driver::PostgreSQL ){
       $this->engine = new PostgreSQLEngine(
-        $this->sql(), $cacheName, $connectionDns
+        $this->sql(), $cacheName, $this->queryProps, $connectionDns
       );
     } else if( $connectionDns->driver === Driver::Sqlite ){
       $this->engine = new SqliteEngine(
-        $this->sql(), $cacheName, $connectionDns
+        $this->sql(), $cacheName, $this->queryProps, $connectionDns
       );
     } else if( $connectionDns->driver === Driver::MsSql ){
       $this->engine = new MsSqlEngine(
-        $this->sql(), $cacheName, $connectionDns
+        $this->sql(), $cacheName, $this->queryProps, $connectionDns
       );
     } else if( $connectionDns->driver === Driver::MySql ){
       $this->engine = new MySqlEngine(
-        $this->sql(), $cacheName, $connectionDns
+        $this->sql(), $cacheName, $this->queryProps, $connectionDns
       );
     }
   }
 
   private function defineRecordSet(
   ): void {
-
+    $this->engine->applyWhere();
   }
 }

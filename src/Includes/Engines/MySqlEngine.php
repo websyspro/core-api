@@ -2,6 +2,8 @@
 
 namespace Websyspro\Server\Includes\Engines;
 
+use Websyspro\Server\Includes\Interfaces\QueryProps;
+
 class MySqlEngine
 extends AbstractEngine
 {
@@ -36,8 +38,6 @@ extends AbstractEngine
 		);
 	} 
 
-  public function applyWhere(
-  ): void {}
 
   public function applyOrderBy(
   ): void {}

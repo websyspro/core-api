@@ -49,9 +49,6 @@ extends AbstractEngine
 		);
 	}
 
-  public function applyWhere(
-  ): void {}
-
   public function applyOrderBy(
   ): void {}
   

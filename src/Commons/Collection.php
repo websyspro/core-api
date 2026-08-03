@@ -46,6 +46,11 @@ class Collection
     return $this->count() === 0;
   }
 
+  public function exist(
+  ): bool {
+    return $this->count() !== 0;
+  }
+
   public function mapper(
     Closure $fn
   ): Collection {

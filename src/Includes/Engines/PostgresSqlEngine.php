@@ -4,6 +4,7 @@ namespace Websyspro\Server\Includes\Engines;
 
 use stdClass;
 use Websyspro\Server\Includes\Connection;
+use Websyspro\Server\Includes\Interfaces\QueryProps;
 
 class PostgreSQLEngine
 extends AbstractEngine
@@ -33,9 +34,6 @@ extends AbstractEngine
 			"SELECT count(*) as numRows FROM %s", $this->table
 		);
 	}
-
-  public function applyWhere(
-  ): void {}
 
   public function applyOrderBy(
   ): void {}

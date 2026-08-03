@@ -10,6 +10,7 @@ use Websyspro\Server\Includes\Decorators\Server\Controller;
 use Websyspro\Server\Includes\Decorators\Server\Get;
 use Websyspro\Server\Includes\Decorators\Server\Query;
 use Websyspro\Server\Includes\Exceptions\InternalServerError;
+use Websyspro\Server\Includes\Interfaces\QueryProps;
 
 #[Authenticate()]
 #[Controller("proposta")]
@@ -21,13 +22,10 @@ class PropostaController
   #[Get("/")]
   #[AllowAnonymous()]
   public function index(
-    #[Body()] object $body,
-    #[Query("isError")] int $isError
+    #[Body()] QueryProps $queryProps,
   ): mixed {
-    if( $isError === 1 ){
-      throw new InternalServerError("Erro de teste no controller");
-    }
-
-    return new PropostaView();
+    return new PropostaView(
+      $queryProps
+    );
   }  
 }

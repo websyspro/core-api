@@ -43,7 +43,7 @@ extends AbstractWorkerServer
   private function definePrefix(
   ): void {
     $this->prefix = sprintf(
-      "/v%s", App->version
+      "/v%s", APP->version
     );
   }
 

@@ -43,13 +43,13 @@ abstract class AbstractWorkerServer
 
   public function __construct(
   ){
-    if( defined( "App" )){
-      if( App instanceof AppStructure ){
-        $this->host = App->host;
-        $this->port = App->port;
-        $this->keepAliveTimeout = App->keepAliveTimeOut;
-        $this->maxRequests = App->maxRequests;
-        $this->workers = App->workers;
+    if( defined( "APP" )){
+      if( APP instanceof AppStructure ){
+        $this->host = APP->host;
+        $this->port = APP->port;
+        $this->keepAliveTimeout = APP->keepAliveTimeOut;
+        $this->maxRequests = APP->maxRequests;
+        $this->workers = APP->workers;
       }
     }
   }

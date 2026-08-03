@@ -6,8 +6,12 @@ use Websyspro\Server\Includes\Enums\Schema;
 use Websyspro\Server\Includes\Interfaces\AppStructure;
 use Websyspro\Server\Includes\Interfaces\ConnectionDNS;
 
-if( defined( "App" ) === false ){
-  define( "App", new AppStructure(
+if( defined( "ROOT" ) === false ) {
+  define( "ROOT", __DIR__ . DIRECTORY_SEPARATOR );
+}
+
+if( defined( "APP" ) === false ){
+  define( "APP", new AppStructure(
     port: 3000,
     version: 1,
     maxRequests: 1000,
